@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { dateKey, timestamp } from "./domain";
+
+vi.useFakeTimers({ toFake: ["Date"] });
+vi.setSystemTime(new Date(2026, 9, 25, 12));
 const memory = new Map<string, string>();
 vi.stubGlobal("window", { dispatchEvent: vi.fn() });
 vi.stubGlobal(

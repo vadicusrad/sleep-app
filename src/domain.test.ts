@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   ageLabel,
   dayStats,
@@ -11,6 +11,9 @@ import {
   validateEvents,
 } from "./domain";
 import type { DayRecord, NightRow } from "./domain";
+
+vi.useFakeTimers({ toFake: ["Date"] });
+vi.setSystemTime(new Date(2026, 9, 25, 12));
 const at = (date: string, time: string) => timestamp(date, time);
 const rows: NightRow[] = [
   { id: "1", start: "2026-10-23T21:00", end: "2026-10-24T00:00", comment: "" },
