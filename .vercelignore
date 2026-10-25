@@ -1,0 +1,10 @@
+node_modules
+dist
+.git
+.env*
+docs
+План
+*.pdf
+*.md
+*.tsbuildinfo
+coverage
