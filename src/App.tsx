@@ -554,7 +554,7 @@ function StatItem({ label, value, children, comparison }: { label: string; value
   const result = comparison ? compareRange(comparison.value, comparison.range) : null;
   const summary = comparison && result ? result === "within" ? "В пределах ориентира" : `${result === "below" ? "Меньше" : "Больше"} ориентира на ${duration(rangeDifference(comparison.value, comparison.range))}` : null;
   return <details className={s.statItem}>
-    <summary><span>{label}</span><strong>{value}</strong>{summary && <span className={`${s.statIndicator} ${result === "within" ? s.statIndicatorWithin : s.statIndicatorOutside}`}>{comparison?.summaryContext}{summary}</span>}{comparison?.periodNotice && <span className={s.periodHint}>Период не равен 24 ч</span>}</summary>
+    <summary><span>{label}</span><strong>{value}</strong>{summary && <span className={`${s.statIndicator} ${result === "within" ? s.statIndicatorWithin : s.statIndicatorOutside}`}>{comparison?.summaryContext}{summary}</span>}{comparison?.periodNotice && <span className={s.periodHint}>Период не равен 24 ч</span>}<Icon name="chevron" size={18} className={s.statChevron} /></summary>
     <div className={s.statDetails}>{children}{comparison && <p>Ориентир: {duration(comparison.range[0])}–{duration(comparison.range[1])}</p>}{comparison?.periodNotice && <p>{comparison.periodNotice}</p>}</div>
   </details>;
 }
@@ -664,9 +664,6 @@ function Timeline({
                   <div className={s.between}>
                     <span className={s.betweenLine} />
                     {e.continuation ? `Бодрствование при продлении · ${duration(minutes(prev.at, e.at))}` : `${duration(minutes(prev.at, e.at))} бодрствования`}
-                    {!e.continuation && prev.plannedMinutes !== undefined && (
-                      <small>план {duration(prev.plannedMinutes)}</small>
-                    )}
                   </div>
                 )}
                 <div className={s.event}>
@@ -696,8 +693,8 @@ function Timeline({
                     </div>
                     {wake && <p className={s.sleepCalculation}>Спал {e.continuation ? "ещё " : ""}{duration(minutes(e.at, wake.at))}</p>}
                     {summary && !day.events[i + 2]?.continuation && <p className={s.sleepCalculation}>Итого: сон {duration(summary.sleep)}, перерыв {duration(summary.awake)}</p>}
-                    {e.comment && <div className={s.eventComment}><span>{wake ? "При засыпании" : "Комментарий"}</span><p>{e.comment}</p></div>}
-                    {wake?.comment && <div className={s.eventComment}><span>При пробуждении</span><p>{wake.comment}</p></div>}
+                    {e.comment && <button type="button" className={s.eventComment} onClick={() => onEdit(e)} aria-label={`Изменить комментарий к событию ${timeInput(e.at)}`}><span className={s.commentHeading}>{wake ? "При засыпании" : "Комментарий"}<Icon name="edit" size={14} /></span><span className={s.commentContent}>{e.comment}</span></button>}
+                    {wake?.comment && <button type="button" className={s.eventComment} onClick={() => onEdit(wake)} aria-label={`Изменить комментарий к пробуждению ${timeInput(wake.at)}`}><span className={s.commentHeading}>При пробуждении<Icon name="edit" size={14} /></span><span className={s.commentContent}>{wake.comment}</span></button>}
                   </div>
                 </div>
               </div>
@@ -771,10 +768,6 @@ function DayPage({ initialDate }: { initialDate?: string }) {
   return (
     <>
       <div className={s.dayHeading}>
-        <div className={s.dayHeadingText}>
-          <h1>{date === todayKey ? "Сегодня" : dateLabel(date)}</h1>
-          {birth && ageInWeeks(birth, todayKey) !== null && <span className={s.dayAge}>{ageLabel(birth, todayKey)} ({ageInWeeks(birth, todayKey)} нед.)</span>}
-        </div>
         <div className={s.dateSwitcher}>
           <button
             className={s.iconButton}
@@ -802,6 +795,7 @@ function DayPage({ initialDate }: { initialDate?: string }) {
             <Icon name="chevron" />
           </button>
         </div>
+        {birth && ageInWeeks(birth, todayKey) !== null && <span className={s.dayAge}>{ageLabel(birth, todayKey)} ({ageInWeeks(birth, todayKey)} нед.)</span>}
       </div>
       {!birth && (
         <Link to="/settings" className={s.birthdayHint}>
@@ -815,7 +809,6 @@ function DayPage({ initialDate }: { initialDate?: string }) {
           </span>
         </Link>
       )}
-      <div className={s.dayColumns}>
         <div className={s.mainColumn}>
           <button className={`${s.noteButton} ${s.dayNote}`} onClick={() => setNote(true)}>
             <Icon name="message" size={20} />
@@ -941,35 +934,8 @@ function DayPage({ initialDate }: { initialDate?: string }) {
               setUndo(true);
             }}
           />
-        </div>
-        <aside className={s.rightColumn}>
-          <section className={`${s.card} ${s.nightCard}`}>
-            <div className={s.roundIcon}>
-              <Icon name="moon" size={24} />
-            </div>
-            <h2>Как прошла ночь?</h2>
-            <p>
-              Запишите ночные сны утром.
-              <br />
-              Мы посчитаем, сколько малыш
-              <br className={s.desktopBreak} /> отдыхал на самом деле.
-            </p>
-            {nightDay && (
-              <span className={s.nightDate}>
-                {dateLabel(nightDay.date, { day: "numeric", month: "short" })} →{" "}
-                {dateLabel(shiftDate(nightDay.date, 1), {
-                  day: "numeric",
-                  month: "short",
-                })}
-                {nightDay.night.complete
-                  ? " · заполнена"
-                  : nightDay.night.rows.length
-                    ? " · черновик"
-                    : ""}
-              </span>
-            )}
             <button
-              className={s.outlineButton}
+              className={`${s.outlineButton} ${s.nightButton}`}
               disabled={!nightDay}
               onClick={() => nightDay && setNightDate(nightDay.date)}
             >
@@ -978,13 +944,9 @@ function DayPage({ initialDate }: { initialDate?: string }) {
                 size={17}
               />
               {nightDay?.night.complete ? "Посмотреть ночь" : "Заполнить ночь"}
+              {nightDay && ` · ${dateLabel(nightDay.date, { day: "numeric", month: "short" })} → ${dateLabel(shiftDate(nightDay.date, 1), { day: "numeric", month: "short" })}`}
             </button>
-            {!nightDay && (
-              <small>Станет доступно после отметки «На ночь»</small>
-            )}
-          </section>
-        </aside>
-      </div>
+        </div>
       {eventModal && (
         <EventForm
           date={date}
@@ -1233,7 +1195,7 @@ function Calculator({ rows, setRows }: { rows: CalculatorRow[]; setRows: React.D
         <div className={s.calculatorRows}>
           {rows.map((row, i) => (
             <div className={s.calculatorRow} key={row.id}>
-              {i === 0 ? <span className={s.calculatorIndex} aria-label="Первое значение">1</span> : <label className={s.operationLabel}><span className={s.srOnly}>Действие, промежуток {i + 1}</span><select aria-label={`Действие, промежуток ${i + 1}`} value={row.operation} onChange={(e) => setRows((current) => current.map((item) => item.id === row.id ? { ...item, operation: e.target.value as "+" | "-" } : item))}><option value="+">+</option><option value="-">−</option></select></label>}
+              {i === 0 ? <span className={s.calculatorIndex} aria-label="Первое значение">1</span> : <label className={s.operationLabel}><span className={s.srOnly}>Действие, промежуток {i + 1}</span><select aria-label={`Действие, промежуток ${i + 1}`} value={row.operation} onChange={(e) => setRows((current) => current.map((item) => item.id === row.id ? { ...item, operation: e.target.value as "+" | "-" } : item))}><option value="+">+</option><option value="-">−</option></select><Icon name="chevron" size={15} className={s.operationChevron} /></label>}
               <label>Часы<input type="text" inputMode="numeric" pattern="[0-9]*" maxLength={6} placeholder="0" value={row.hours} aria-label={`Часы, промежуток ${i + 1}`} onChange={(e) => update(row.id, "hours", e.target.value)} /></label>
               <span className={s.calculatorColon}>:</span>
               <label>Минуты<input type="text" inputMode="numeric" pattern="[0-9]*" maxLength={2} placeholder="00" value={row.minutes} aria-label={`Минуты, промежуток ${i + 1}`} aria-invalid={row.minutes !== "" && (!/^\d{1,2}$/.test(row.minutes) || Number(row.minutes) > 59)} onChange={(e) => update(row.id, "minutes", e.target.value)} /></label>
