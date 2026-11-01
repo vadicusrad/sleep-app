@@ -16,7 +16,7 @@ import {
   timestamp,
   validateEvents,
 } from "./domain";
-import { compareRange, napRangeForAge, normsForAge, rangeDifference, nightRangeForAge, totalSleepRangeForAge } from "./norms";
+import { compareRange, normsForAge, rangeDifference, nightRangeForAge, totalSleepRangeForAge } from "./norms";
 import type { DayRecord, NightRow } from "./domain";
 
 vi.useFakeTimers({ toFake: ["Date"] });
@@ -62,6 +62,9 @@ describe("время и фактические итоги", () => {
     expect(sumDurations([{ hours: "", minutes: "59" }, { hours: "", minutes: "1" }])).toBe(60);
     expect(sumDurations([{ hours: "", minutes: "60" }])).toBeNull();
     expect(sumDurations([{ hours: "-1", minutes: "00" }])).toBeNull();
+    expect(sumDurations([{ hours: "2", minutes: "45" }, { hours: "1", minutes: "50", operation: "-" }, { hours: "0", minutes: "30", operation: "+" }])).toBe(85);
+    expect(sumDurations([{ hours: "0", minutes: "15" }, { hours: "1", minutes: "00", operation: "-" }])).toBe(-45);
+    expect(sumDurations([{ hours: "1", minutes: "00" }, { hours: "1", minutes: "00", operation: "-" }])).toBe(0);
   });
   it("объединяет продления, сохраняя перерывы в суммарном бодрствовании", () => {
     const d: DayRecord = { ...day, events: [
@@ -148,10 +151,6 @@ describe("время и фактические итоги", () => {
     expect(compareRange(195, normsForAge(10)?.wakeRange)).toBe("within");
     expect(compareRange(194, normsForAge(10)?.wakeRange)).toBe("below");
     expect(compareRange(241, normsForAge(10)?.wakeRange)).toBe("above");
-    expect(napRangeForAge(14, 1, false)).toBeNull();
-    expect(napRangeForAge(14, 1, true)).toEqual([90, 120]);
-    expect(napRangeForAge(14, 2, true)).toEqual([40, 80]);
-    expect(napRangeForAge(17, 2, true)).toBeNull();
     expect(normsForAge(8)?.dayRange).toBeNull();
     expect(rangeDifference(270, [180, 240])).toBe(30);
     expect(rangeDifference(570, [600, 720])).toBe(30);

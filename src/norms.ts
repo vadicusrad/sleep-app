@@ -82,14 +82,6 @@ export function normsForAge(months: number | null) {
   if (months === null) return undefined;
   return norms.find((row) => months >= row.ageMin && months <= row.ageMax);
 }
-export function napRangeForAge(months: number | null, naps: number, dayFinished: boolean): number[] | null {
-  if (months !== null && months >= 13 && months <= 15) {
-    if (!dayFinished) return null;
-    return naps === 1 ? [90, 120] : naps === 2 ? [40, 80] : null;
-  }
-  if (months !== null && months >= 16 && months <= 18 && naps !== 1) return null;
-  return normsForAge(months)?.napRange ?? null;
-}
 export function compareRange(value: number, range?: number[] | null) {
   if (!range) return null;
   return value < range[0] ? "below" : value > range[1] ? "above" : "within";

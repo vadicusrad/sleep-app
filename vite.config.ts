@@ -9,8 +9,8 @@ export default defineConfig({
       registerType: "prompt",
       includeAssets: ["icon.svg", "icon-192.png", "icon-512.png"],
       manifest: {
-        name: "Тихий час — дневник сна",
-        short_name: "Тихий час",
+        name: "Сны Ромы — дневник сна",
+        short_name: "Сны Ромы",
         description: "Сон малыша, без подсчетов в голове",
         lang: "ru",
         theme_color: "#f7f8f2",

@@ -49,13 +49,13 @@ export function dayPeriodNotice(start: number, end: number): string | null {
   if (elapsed === 1440) return null;
   return `Период между подъёмами — ${duration(elapsed)}, а ориентир указан за 24 ч. Сравнение приблизительное.`;
 }
-export function sumDurations(rows: { hours: string; minutes: string }[]): number | null {
+export function sumDurations(rows: { hours: string; minutes: string; operation?: "+" | "-" }[]): number | null {
   let total = 0;
-  for (const row of rows) {
+  for (const [index, row] of rows.entries()) {
     if (!/^\d{0,6}$/.test(row.hours) || !/^\d{0,2}$/.test(row.minutes)) return null;
     const hours = Number(row.hours), mins = Number(row.minutes);
     if (mins > 59) return null;
-    total += hours * 60 + mins;
+    total += (index > 0 && row.operation === "-" ? -1 : 1) * (hours * 60 + mins);
   }
   return Number.isSafeInteger(total) ? total : null;
 }

@@ -27,7 +27,7 @@ import {
   uid,
 } from "./domain";
 import type { DayRecord, EventKind, NightRow, SleepEvent } from "./domain";
-import { norms, normsForAge, napRangeForAge, compareRange, rangeDifference, nightRangeForAge, totalSleepRangeForAge } from "./norms";
+import { norms, normsForAge, compareRange, rangeDifference, nightRangeForAge, totalSleepRangeForAge } from "./norms";
 import s from "./App.module.css";
 
 const nav = [
@@ -550,12 +550,6 @@ function NightEditor({
   );
 }
 
-function NormBadge({ value, range, subject }: { value: number; range?: number[] | null; subject: string }) {
-  const result = compareRange(value, range);
-  if (!result || !range) return null;
-  const label = result === "within" ? "В пределах ориентира" : `${subject} ${result === "below" ? "меньше" : "больше"} ориентира на ${duration(rangeDifference(value, range))}`;
-  return <details className={`${s.normBadge} ${result === "within" ? s.normWithin : s.normOutside}`}><summary>{label}</summary><span className={s.normRange}>Ориентир: {duration(range[0])}–{duration(range[1])}</span></details>;
-}
 function StatItem({ label, value, children, comparison }: { label: string; value: string; children: ReactNode; comparison?: { value: number; range: number[]; subject: string; periodNotice?: string | null; summaryContext?: string } }) {
   const result = comparison ? compareRange(comparison.value, comparison.range) : null;
   const summary = comparison && result ? result === "within" ? "В пределах ориентира" : `${result === "below" ? "Меньше" : "Больше"} ориентира на ${duration(rangeDifference(comparison.value, comparison.range))}` : null;
@@ -623,16 +617,11 @@ function Timeline({
   day,
   onEdit,
   onUndo,
-  age,
 }: {
   day?: DayRecord;
   onEdit: (e: SleepEvent) => void;
   onUndo: () => void;
-  age: number | null;
 }) {
-  const norm = normsForAge(age);
-  const finished = day?.events.at(-1)?.kind === "night";
-  const napRange = napRangeForAge(age, dayStats(day).naps, !!finished);
   return (
     <section className={s.card}>
       <div className={s.sectionHead}>
@@ -642,7 +631,6 @@ function Timeline({
         </div>
         <span className={s.pill}>{day?.events.length ?? 0} событий</span>
       </div>
-      {!norm && <p className={s.normHint}>{age === null ? "Укажите дату рождения в настройках, чтобы увидеть возрастные ориентиры." : "Для этого возраста в таблице нет ориентиров (доступны 8–18 месяцев)."}</p>}
       {!day?.events.length ? (
         <div className={s.emptyTimeline}>
           <div className={s.emptyIcon}>
@@ -675,7 +663,6 @@ function Timeline({
                     {!e.continuation && prev.plannedMinutes !== undefined && (
                       <small>план {duration(prev.plannedMinutes)}</small>
                     )}
-                    {!e.continuation && <NormBadge subject="Бодрствование" value={minutes(prev.at, e.at)} range={norm?.wakeRange} />}
                   </div>
                 )}
                 <div className={s.event}>
@@ -698,7 +685,6 @@ function Timeline({
                       <p className={s.sleepCalculation}>Спал {prev.continuation ? "ещё " : ""}{duration(minutes(prev.at, e.at))}</p>
                     )}
                     {summary && !day.events[i + 1]?.continuation && <p className={s.sleepCalculation}>Итого: сон {duration(summary.sleep)}, перерыв {duration(summary.awake)}</p>}
-                    {prev?.kind === "sleep" && !day.events[i + 1]?.continuation && <NormBadge subject="Дневной сон" value={summary?.sleep ?? minutes(prev.at, e.at)} range={napRange} />}
                     {e.comment && <div className={s.eventComment}><span>Комментарий</span><p>{e.comment}</p></div>}
                     <button
                       className={s.commentButton}
@@ -931,7 +917,7 @@ function DayPage({ initialDate }: { initialDate?: string }) {
                   </div>
                 )}
               </div>
-              {!last && <CloudArt />}
+              <CloudArt />
             </div>
             {last?.kind === "wake" && (
               <PlanForm key={last.id} day={day} last={last} />
@@ -952,7 +938,6 @@ function DayPage({ initialDate }: { initialDate?: string }) {
           <Stats day={day} next={next} now={now} age={age} />
           <Timeline
             day={day}
-            age={age}
             onEdit={(event) => setEventModal({ kind: event.kind, event })}
             onUndo={() => {
               setUndoError("");
@@ -1262,8 +1247,8 @@ function Norms() {
     </>
   );
 }
-type CalculatorRow = { id: string; hours: string; minutes: string };
-const newCalculatorRow = (): CalculatorRow => ({ id: uid(), hours: "", minutes: "" });
+type CalculatorRow = { id: string; hours: string; minutes: string; operation: "+" | "-" };
+const newCalculatorRow = (): CalculatorRow => ({ id: uid(), hours: "", minutes: "", operation: "+" });
 function Calculator({ rows, setRows }: { rows: CalculatorRow[]; setRows: React.Dispatch<React.SetStateAction<CalculatorRow[]>> }) {
   const total = sumDurations(rows);
   const hasValues = rows.some((row) => row.hours !== "" || row.minutes !== "");
@@ -1272,14 +1257,14 @@ function Calculator({ rows, setRows }: { rows: CalculatorRow[]; setRows: React.D
   }
   return (
     <>
-      <PageTitle kicker="ПРОСТЫЕ ПОДСЧЁТЫ" title="Калькулятор часов" subtitle="Сложите любое количество промежутков времени." />
+      <PageTitle kicker="ПРОСТЫЕ ПОДСЧЁТЫ" title="Калькулятор часов" subtitle="Складывайте и вычитайте промежутки времени." />
       <section className={`${s.card} ${s.calculator}`}>
-        <h2>Сложить время</h2>
-        <p>Введите часы и минуты для каждого промежутка.</p>
+        <h2>Расчёт времени</h2>
+        <p>Введите часы и минуты, затем выберите плюс или минус.</p>
         <div className={s.calculatorRows}>
           {rows.map((row, i) => (
             <div className={s.calculatorRow} key={row.id}>
-              <span className={s.calculatorIndex}>{i + 1}</span>
+              {i === 0 ? <span className={s.calculatorIndex} aria-label="Первое значение">1</span> : <label className={s.operationLabel}><span className={s.srOnly}>Действие, промежуток {i + 1}</span><select aria-label={`Действие, промежуток ${i + 1}`} value={row.operation} onChange={(e) => setRows((current) => current.map((item) => item.id === row.id ? { ...item, operation: e.target.value as "+" | "-" } : item))}><option value="+">+</option><option value="-">−</option></select></label>}
               <label>Часы<input type="text" inputMode="numeric" pattern="[0-9]*" maxLength={6} placeholder="0" value={row.hours} aria-label={`Часы, промежуток ${i + 1}`} onChange={(e) => update(row.id, "hours", e.target.value)} /></label>
               <span className={s.calculatorColon}>:</span>
               <label>Минуты<input type="text" inputMode="numeric" pattern="[0-9]*" maxLength={2} placeholder="00" value={row.minutes} aria-label={`Минуты, промежуток ${i + 1}`} aria-invalid={row.minutes !== "" && (!/^\d{1,2}$/.test(row.minutes) || Number(row.minutes) > 59)} onChange={(e) => update(row.id, "minutes", e.target.value)} /></label>
@@ -1291,8 +1276,8 @@ function Calculator({ rows, setRows }: { rows: CalculatorRow[]; setRows: React.D
         {total === null && <ErrorText message="Введите целые часы и минуты от 0 до 59." />}
         <div className={s.calculatorResult} role="status" aria-live="polite">
           <span>Итого</span>
-          <strong>{total !== null && hasValues ? `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}` : "—"}</strong>
-          {total !== null && hasValues && <small>{duration(total)}</small>}
+          <strong>{total !== null && hasValues ? `${total < 0 ? "−" : ""}${Math.floor(Math.abs(total) / 60)}:${String(Math.abs(total) % 60).padStart(2, "0")}` : "—"}</strong>
+          {total !== null && hasValues && <small>{total < 0 ? "−" : ""}{duration(Math.abs(total))}</small>}
         </div>
         <button type="button" className={s.calculatorClear} onClick={() => setRows([newCalculatorRow(), newCalculatorRow()])}>Очистить</button>
       </section>
@@ -1324,7 +1309,7 @@ function Settings({
       const url = URL.createObjectURL(new Blob([exportDiary()], { type: "application/json" }));
       const link = document.createElement("a");
       link.href = url;
-      link.download = `tihiy-chas-${dateKey()}.json`;
+      link.download = `sny-romy-${dateKey()}.json`;
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -1422,7 +1407,7 @@ function Settings({
           </div>
           <h2>Всегда под рукой</h2>
           <p>
-            Установите «Тихий час» на главный экран Android. После первой
+            Установите «Сны Ромы» на главный экран Android. После первой
             загрузки дневник работает и без интернета.
           </p>
           {install ? (
@@ -1546,7 +1531,7 @@ export default function App() {
             <i />
           </span>
           <span>
-            тихий час<small>ДНЕВНИК СНА МАЛЫША</small>
+            Сны Ромы<small>ДНЕВНИК СНА МАЛЫША</small>
           </span>
         </Link>
         <div className={s.sidebarLabel}>ВАШ ДНЕВНИК</div>
@@ -1636,7 +1621,7 @@ export default function App() {
             />
           </Routes>
           <footer className={s.footer}>
-            Один сон за раз <span>✦</span> Тихий час
+            Один сон за раз <span>✦</span> Сны Ромы
           </footer>
         </main>
       </div>
