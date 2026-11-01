@@ -679,16 +679,16 @@ function Timeline({
                             : "Проснулся"}
                     </h3>
                     {prev?.kind === "sleep" && (
-                      <p>Спал {prev.continuation ? "ещё " : ""}{duration(minutes(prev.at, e.at))}</p>
+                      <p className={s.sleepCalculation}>Спал {prev.continuation ? "ещё " : ""}{duration(minutes(prev.at, e.at))}</p>
                     )}
-                    {summary && !day.events[i + 1]?.continuation && <p>Итого: сон {duration(summary.sleep)}, перерыв {duration(summary.awake)}</p>}
-                    {e.comment && <p className={s.eventComment}>{e.comment}</p>}
+                    {summary && !day.events[i + 1]?.continuation && <p className={s.sleepCalculation}>Итого: сон {duration(summary.sleep)}, перерыв {duration(summary.awake)}</p>}
+                    {e.comment && <div className={s.eventComment}><span>Комментарий</span><p>{e.comment}</p></div>}
                     <button
                       className={s.commentButton}
                       onClick={() => onEdit(e)}
                     >
                       <Icon name={e.comment ? "edit" : "message"} size={13} />
-                      {e.comment ? "Изменить" : "Комментарий"}
+                      {e.comment ? "Изменить комментарий" : "Добавить комментарий"}
                     </button>
                   </div>
                   <button

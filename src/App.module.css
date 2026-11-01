@@ -2112,3 +2112,38 @@ tbody tr:last-child td {
   font-size: 12px;
   color: #77876a;
 }
+
+/* Readable text and distinct treatments for calculations and personal notes. */
+.timeline .eventText h3 { font-size: 16px; }
+.timeline .eventText > .sleepCalculation {
+  color: #52674a;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+.eventText .eventComment {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-left: 3px solid #b4a078;
+  border-radius: 0 8px 8px 0;
+  background: #f6f1e7;
+  color: #554f42;
+  overflow-wrap: anywhere;
+}
+.eventComment span { display: block; color: #71634d; font-size: 12px; font-weight: 600; }
+.eventComment p { margin-top: 3px; font-size: 14px; line-height: 1.5; white-space: pre-wrap; }
+.commentButton { color: #526b49; font-size: 14px; min-height: 38px; }
+.eventTime { color: #526b49; font-size: 16px; }
+.between { color: #5f7053; font-size: 14px; }
+.between small { font-size: 12px; }
+.undoButton { color: #68765e; font-size: 13px; }
+.noteButton, .copyButton, .planForm p, .planResult p, .sectionHead p,
+.statusContent p, .nightCard p, .historyDay p, .modalHead p, .small,
+.stat > span, .stat small, .dateLabel, .softButton, .primary,
+.nightRow label, .nightRow textarea, .nightRow select, .normCard td,
+.normCard th, .normFootnotes p, .storageInfo p, .installCard > p {
+  font-size: 14px;
+}
+.form label, .form input, .form textarea, .form select { font-size: 16px; }
+.planForm h3, .historyDay h3 { font-size: 16px; }
+.mobileNav a { font-size: 12px; }
