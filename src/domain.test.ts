@@ -1,8 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
 import {
   ageLabel,
+  ageMonths,
   ageInWeeks,
   dayStats,
+  dayPeriodNotice,
   diaryText,
   duration,
   minutes,
@@ -14,6 +16,7 @@ import {
   timestamp,
   validateEvents,
 } from "./domain";
+import { compareRange, napRangeForAge, normsForAge, rangeDifference, nightRangeForAge, totalSleepRangeForAge } from "./norms";
 import type { DayRecord, NightRow } from "./domain";
 
 vi.useFakeTimers({ toFake: ["Date"] });
@@ -137,11 +140,38 @@ describe("время и фактические итоги", () => {
     expect(ageLabel("2026-01-31", "2026-03-01")).toBe("1 мес. 1 дн.");
     expect(ageLabel("2026-10-01", "2026-09-30")).toBe("");
   });
+  it("сравнивает ориентиры по возрасту на дату дня и учитывает число снов", () => {
+    expect(ageMonths("2026-01-31", "2026-10-30")).toBe(8);
+    expect(ageMonths("2026-01-31", "2026-10-31")).toBe(9);
+    expect(normsForAge(7)).toBeUndefined();
+    expect(normsForAge(19)).toBeUndefined();
+    expect(compareRange(195, normsForAge(10)?.wakeRange)).toBe("within");
+    expect(compareRange(194, normsForAge(10)?.wakeRange)).toBe("below");
+    expect(compareRange(241, normsForAge(10)?.wakeRange)).toBe("above");
+    expect(napRangeForAge(14, 1, false)).toBeNull();
+    expect(napRangeForAge(14, 1, true)).toEqual([90, 120]);
+    expect(napRangeForAge(14, 2, true)).toEqual([40, 80]);
+    expect(napRangeForAge(17, 2, true)).toBeNull();
+    expect(normsForAge(8)?.dayRange).toBeNull();
+    expect(rangeDifference(270, [180, 240])).toBe(30);
+    expect(rangeDifference(570, [600, 720])).toBe(30);
+    expect(rangeDifference(600, [600, 720])).toBe(0);
+    expect(nightRangeForAge(10)).toEqual([600, 720]);
+    expect(nightRangeForAge(7)).toBeNull();
+    expect(totalSleepRangeForAge(12)).toEqual([780, 840]);
+    expect(totalSleepRangeForAge(13)).toEqual([720, 840]);
+  });
   it("считает полные недели по календарным датам", () => {
     expect(ageInWeeks("2026-01-01", "2026-01-07")).toBe(0);
     expect(ageInWeeks("2026-01-01", "2026-01-08")).toBe(1);
     expect(ageInWeeks("2026-03-01", "2026-04-01")).toBe(4);
     expect(ageInWeeks("2026-10-01", "2026-09-30")).toBeNull();
+  });
+  it("объясняет сравнение с суточным ориентиром при иной длине периода", () => {
+    const start = at("2026-10-23", "07:00");
+    expect(dayPeriodNotice(start, at("2026-10-24", "07:00"))).toBeNull();
+    expect(dayPeriodNotice(start, at("2026-10-24", "06:00"))).toContain("23 ч");
+    expect(dayPeriodNotice(start, at("2026-10-24", "08:30"))).toContain("25 ч 30 мин");
   });
   it("копирует факты и комментарии, без выдуманной полной ночи", () => {
     const next = {

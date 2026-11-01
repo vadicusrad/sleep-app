@@ -44,6 +44,11 @@ export function duration(value: number) {
     ? `${Math.floor(m / 60)} ч${m % 60 ? ` ${m % 60} мин` : ""}`
     : `${m} мин`;
 }
+export function dayPeriodNotice(start: number, end: number): string | null {
+  const elapsed = minutes(start, end);
+  if (elapsed === 1440) return null;
+  return `Период между подъёмами — ${duration(elapsed)}, а ориентир указан за 24 ч. Сравнение приблизительное.`;
+}
 export function sumDurations(rows: { hours: string; minutes: string }[]): number | null {
   let total = 0;
   for (const row of rows) {
@@ -60,10 +65,11 @@ export function dateLabel(
 ) {
   return new Date(`${date}T12:00:00`).toLocaleDateString("ru-RU", options);
 }
-export function ageLabel(birth: string, on = dateKey()) {
-  if (!birth || birth > on) return "";
+export function ageMonths(birth: string, on = dateKey()): number | null {
+  if (!birth || birth > on) return null;
   const b = new Date(`${birth}T12:00:00`),
     d = new Date(`${on}T12:00:00`);
+  if (!Number.isFinite(b.getTime()) || !Number.isFinite(d.getTime())) return null;
   let months =
     (d.getFullYear() - b.getFullYear()) * 12 + d.getMonth() - b.getMonth();
   const anniversary = (m: number) => {
@@ -77,8 +83,16 @@ export function ageLabel(birth: string, on = dateKey()) {
     );
   };
   if (anniversary(months) > d) months--;
+  return months;
+}
+export function ageLabel(birth: string, on = dateKey()) {
+  const months = ageMonths(birth, on);
+  if (months === null) return "";
+  const b = new Date(`${birth}T12:00:00`), d = new Date(`${on}T12:00:00`);
+  const year = b.getFullYear() + Math.floor((b.getMonth() + months) / 12);
+  const month = (b.getMonth() + months) % 12;
   const days = Math.round(
-    (d.getTime() - anniversary(months).getTime()) / 86400000,
+    (d.getTime() - new Date(year, month, Math.min(b.getDate(), new Date(year, month + 1, 0).getDate()), 12).getTime()) / 86400000,
   );
   return `${months} мес.${days ? ` ${days} дн.` : ""}`;
 }

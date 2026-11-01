@@ -825,7 +825,7 @@ h1 {
   color: #a4aa98;
   position: relative;
 }
-.between > span {
+.betweenLine {
   position: absolute;
   width: 1px;
   top: 0;
@@ -2186,6 +2186,48 @@ tbody tr:last-child td {
 .calculatorResult strong { font-size: 28px; font-variant-numeric: tabular-nums; }
 .calculatorResult small { font-size: 14px; }
 .calculatorClear { margin-top: 12px; padding: 10px 0; background: transparent; color: #667a59; font-size: 14px; }
+.normHint { padding: 0 24px 8px; color: #66745c; font-size: 13px; line-height: 1.5; }
+.normBadge, .stat .normBadge {
+  display: inline-block;
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 7px;
+  padding: 4px 8px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: normal;
+}
+.normWithin, .stat .normWithin { background: #e2f0df; color: #315f38; }
+.normOutside, .stat .normOutside { background: #fff0d8; color: #805019; }
+.normBadge summary { cursor: pointer; list-style: none; }
+.normBadge summary::-webkit-details-marker, .statItem summary::-webkit-details-marker { display: none; }
+.normBadge summary::after { content: "  ⌄"; }
+.normBadge[open] summary::after { content: "  ⌃"; }
+.normRange { display: block; margin-top: 2px; font-weight: 400; }
+.stat .normBadge, .eventText .normBadge { display: table; }
+.between .normBadge { flex-basis: 100%; margin-top: 0; }
+.dayStats { margin: 20px 0 23px; padding: 20px 24px; }
+.statsHeading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.statsHeading h2 { font-size: 17px; }
+.statsHeading a { color: #526b49; font-size: 14px; }
+.dayStats .statsGrid { gap: 0; margin: 14px 0 0; }
+.statItem { min-width: 0; padding: 12px; border-top: 1px solid #e7e9df; }
+.statItem:nth-child(odd) { border-right: 1px solid #e7e9df; }
+.statItem summary { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding-right: 16px; position: relative; cursor: pointer; list-style: none; }
+.statItem summary > span:first-child { color: #68775f; font-size: 14px; }
+.statItem summary strong { color: #34452f; font-size: 21px; font-variant-numeric: tabular-nums; }
+.statItem summary::after { content: "⌄"; position: absolute; right: 0; top: 0; color: #65785c; font-size: 16px; }
+.statItem[open] summary::after { content: "⌃"; }
+.statIndicator, .periodHint { font-size: 12px; line-height: 1.4; }
+.statIndicatorWithin { color: #38683f; }
+.statIndicatorOutside { color: #8a5519; }
+.periodHint { color: #715d49; }
+.statDetails { margin-top: 10px; color: #596b50; font-size: 13px; line-height: 1.5; }
+.statDetails p + p { margin-top: 6px; }
+.statDetails .normBadge { margin-top: 8px; }
+.statusContent { min-height: 0; }
 .themeCard { margin-top: 20px; padding: 25px; }
 .themeCard h2 { font-size: 20px; font-weight: 550; }
 .themeCard p { margin-top: 10px; color: #607058; font-size: 14px; }
@@ -2219,9 +2261,17 @@ tbody tr:last-child td {
 :global([data-theme="dark"]) .app :is(.calculatorRow label, .calculatorIndex, .calculatorColon, .calculatorRemove, .calculatorAdd, .calculatorClear) { color: #cbdcc4; }
 :global([data-theme="dark"]) .app .calculatorResult { background: #39493b; color: #edf2e9; }
 :global([data-theme="dark"]) .app .calculatorRow input[aria-invalid="true"] { border-color: #e49781; }
+:global([data-theme="dark"]) .app .normWithin, :global([data-theme="dark"]) .app .stat .normWithin { background: #385a3e; color: #e3f7df; }
+:global([data-theme="dark"]) .app .normOutside, :global([data-theme="dark"]) .app .stat .normOutside { background: #60472e; color: #ffe4bd; }
+:global([data-theme="dark"]) .app :is(.statItem, .statItem:nth-child(odd)) { border-color: #465448; }
+:global([data-theme="dark"]) .app :is(.statItem summary > span:first-child, .statItem summary strong, .statDetails, .statsHeading a) { color: #dce6d9; }
+:global([data-theme="dark"]) .app .statItem summary::after { color: #c2d2bc; }
+:global([data-theme="dark"]) .app .statIndicatorWithin { color: #bde0ba; }
+:global([data-theme="dark"]) .app .statIndicatorOutside { color: #ffd09a; }
+:global([data-theme="dark"]) .app .periodHint { color: #ead1b6; }
 :global([data-theme="dark"]) .app .eventComment :is(span, p) { color: #f0e5d1; }
 :global([data-theme="dark"]) .app .timeline .eventText > .sleepCalculation { color: #cfe3c5; }
-:global([data-theme="dark"]) .app :is(.timelineItem::after, .between > span) { background: #536453; }
+:global([data-theme="dark"]) .app :is(.timelineItem::after, .betweenLine) { background: #536453; }
 :global([data-theme="dark"]) .app :is(.tableScroll th:first-child, th) { background: #354437; }
 :global([data-theme="dark"]) .app .tableScroll td:first-child { background: #242e27; }
 :global([data-theme="dark"]) .app :is(td, th, .modalHead, .nightSummary, .timeline, .historyDate, .topbar, .sidebar) { border-color: #465448; }
@@ -2233,4 +2283,7 @@ tbody tr:last-child td {
   :global([data-theme="dark"]) .app .mobileNav { background: #242e27ed; border-color: #435145; }
   .mobileNav a { flex: 1; min-width: 0; padding: 5px 1px; font-size: 11px; }
   .calculator { padding: 20px 16px; }
+  .statusContent { min-height: 0; }
+  .dayStats { padding: 18px 16px; }
+  .statItem { padding: 12px 9px; }
 }

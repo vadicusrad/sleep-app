@@ -8,9 +8,11 @@ import type { DiaryData } from "./store";
 import {
   ageLabel,
   ageInWeeks,
+  ageMonths,
   dateKey,
   dateLabel,
   dayStats,
+  dayPeriodNotice,
   diaryText,
   duration,
   localDateTime,
@@ -25,7 +27,7 @@ import {
   uid,
 } from "./domain";
 import type { DayRecord, EventKind, NightRow, SleepEvent } from "./domain";
-import { norms } from "./norms";
+import { norms, normsForAge, napRangeForAge, compareRange, rangeDifference, nightRangeForAge, totalSleepRangeForAge } from "./norms";
 import s from "./App.module.css";
 
 const nav = [
@@ -548,88 +550,99 @@ function NightEditor({
   );
 }
 
+function NormBadge({ value, range, subject }: { value: number; range?: number[] | null; subject: string }) {
+  const result = compareRange(value, range);
+  if (!result || !range) return null;
+  const label = result === "within" ? "В пределах ориентира" : `${subject} ${result === "below" ? "меньше" : "больше"} ориентира на ${duration(rangeDifference(value, range))}`;
+  return <details className={`${s.normBadge} ${result === "within" ? s.normWithin : s.normOutside}`}><summary>{label}</summary><span className={s.normRange}>Ориентир: {duration(range[0])}–{duration(range[1])}</span></details>;
+}
+function StatItem({ label, value, children, comparison }: { label: string; value: string; children: ReactNode; comparison?: { value: number; range: number[]; subject: string; periodNotice?: string | null; summaryContext?: string } }) {
+  const result = comparison ? compareRange(comparison.value, comparison.range) : null;
+  const summary = comparison && result ? result === "within" ? "В пределах ориентира" : `${result === "below" ? "Меньше" : "Больше"} ориентира на ${duration(rangeDifference(comparison.value, comparison.range))}` : null;
+  return <details className={s.statItem}>
+    <summary><span>{label}</span><strong>{value}</strong>{summary && <span className={`${s.statIndicator} ${result === "within" ? s.statIndicatorWithin : s.statIndicatorOutside}`}>{comparison?.summaryContext}{summary}</span>}{comparison?.periodNotice && <span className={s.periodHint}>Период не равен 24 ч</span>}</summary>
+    <div className={s.statDetails}>{children}{comparison && <p>Ориентир: {duration(comparison.range[0])}–{duration(comparison.range[1])}</p>}{comparison?.periodNotice && <p>{comparison.periodNotice}</p>}</div>
+  </details>;
+}
 function Stats({
   day,
   next,
   now,
+  age,
 }: {
   day?: DayRecord;
   next?: DayRecord;
   now: number;
+  age: number | null;
 }) {
   const stats = dayStats(day, now);
   const complete = !!day?.night.complete && !!next;
+  const periodNotice = complete && day?.events[0] && next?.events[0] ? dayPeriodNotice(day.events[0].at, next.events[0].at) : null;
+  const dayFinished = day?.events.at(-1)?.kind === "night";
+  const norm = normsForAge(age);
+  const dayRange = dayFinished && !(age !== null && age >= 16 && stats.naps !== 1) ? norm?.dayRange : null;
+  const awakeValue = complete ? stats.awake + nightStats(day!.night.rows).awake : 0;
+  const nightRange = day?.night.complete ? nightRangeForAge(age) : null;
+  const totalRange = complete ? totalSleepRangeForAge(age) : null;
   return (
-    <div className={s.statsGrid}>
-      <div className={s.stat}>
-        <span>
-          <Icon name="sun" size={17} />
-          Дневной сон
-        </span>
-        <strong>{day?.events.length ? duration(stats.sleep) : "—"}</strong>
-        <small>
+    <section className={`${s.card} ${s.dayStats}`}>
+      <div className={s.statsHeading}><h2>Итоги дня</h2><Link to="/norms">Ориентиры</Link></div>
+      <div className={s.statsGrid}>
+      <StatItem label="Дневной сон" value={day?.events.length ? duration(stats.sleep) : "—"} comparison={dayRange ? { subject: "Дневной сон", value: stats.sleep, range: dayRange } : undefined}>
+        <p>
           {stats.naps
             ? `${stats.naps} ${stats.naps === 1 ? "дневной сон" : "дневных сна"}`
             : "Пока без дневных снов"}
-        </small>
-      </div>
-      <div className={s.stat}>
-        <span>
-          <Icon name="clock" size={17} />
-          Бодрствование
-        </span>
-        <strong>{day?.events.length ? duration(stats.awake) : "—"}</strong>
-        <small>
+        </p>
+      </StatItem>
+      <StatItem label="Бодрствование" value={day?.events.length ? duration(stats.awake) : "—"} comparison={complete && norm?.awakeRange ? { subject: "Бодрствование за период", value: awakeValue, range: norm.awakeRange, periodNotice, summaryContext: `За период ${duration(awakeValue)}: ` } : undefined}>
+        <p>
           {day?.events.at(-1)?.kind === "night"
             ? "За дневной период"
             : "На данный момент"}
-        </small>
-      </div>
-      <div className={s.stat}>
-        <span>
-          <Icon name="moon" size={17} />
-          Ночной сон
-        </span>
-        <strong>{day?.night.complete ? duration(stats.night) : "—"}</strong>
-        <small>
+        </p>
+        {complete && <p>За период с ночными пробуждениями: {duration(awakeValue)}</p>}
+      </StatItem>
+      <StatItem label="Ночной сон" value={day?.night.complete ? duration(stats.night) : "—"} comparison={nightRange ? { subject: "Ночной сон", value: stats.night, range: nightRange } : undefined}>
+        <p>
           {day?.night.complete
             ? "Фактическое время сна"
             : day?.night.rows.length
               ? "Есть черновик"
               : "Заполняем утром"}
-        </small>
+        </p>
+      </StatItem>
+      <StatItem label="Сон за сутки" value={complete ? duration(stats.sleep + stats.night) : "—"} comparison={totalRange ? { subject: "Сон за период", value: stats.sleep + stats.night, range: totalRange, periodNotice } : undefined}>
+        <p>{complete ? "От подъема до подъема" : "Итог после заполнения ночи"}</p>
+      </StatItem>
       </div>
-      <div className={`${s.stat} ${s.totalStat}`}>
-        <span>
-          <Icon name="leaf" size={17} />
-          Сон за сутки
-        </span>
-        <strong>{complete ? duration(stats.sleep + stats.night) : "—"}</strong>
-        <small>
-          {complete ? "От подъема до подъема" : "Итог после заполнения ночи"}
-        </small>
-      </div>
-    </div>
+    </section>
   );
 }
 function Timeline({
   day,
   onEdit,
   onUndo,
+  age,
 }: {
   day?: DayRecord;
   onEdit: (e: SleepEvent) => void;
   onUndo: () => void;
+  age: number | null;
 }) {
+  const norm = normsForAge(age);
+  const finished = day?.events.at(-1)?.kind === "night";
+  const napRange = napRangeForAge(age, dayStats(day).naps, !!finished);
   return (
     <section className={s.card}>
       <div className={s.sectionHead}>
         <div>
           <h2>Ритм дня</h2>
-          <p>Маленькие события большого дня</p>
+          {!day?.events.length && <p>Маленькие события большого дня</p>}
         </div>
         <span className={s.pill}>{day?.events.length ?? 0} событий</span>
       </div>
+      {!norm && <p className={s.normHint}>{age === null ? "Укажите дату рождения в настройках, чтобы увидеть возрастные ориентиры." : "Для этого возраста в таблице нет ориентиров (доступны 8–18 месяцев)."}</p>}
       {!day?.events.length ? (
         <div className={s.emptyTimeline}>
           <div className={s.emptyIcon}>
@@ -657,11 +670,12 @@ function Timeline({
               <div key={e.id} className={s.timelineItem}>
                 {prev?.kind === "wake" && (
                   <div className={s.between}>
-                    <span />
+                    <span className={s.betweenLine} />
                     {e.continuation ? `Бодрствование при продлении · ${duration(minutes(prev.at, e.at))}` : `${duration(minutes(prev.at, e.at))} бодрствования`}
                     {!e.continuation && prev.plannedMinutes !== undefined && (
                       <small>план {duration(prev.plannedMinutes)}</small>
                     )}
+                    {!e.continuation && <NormBadge subject="Бодрствование" value={minutes(prev.at, e.at)} range={norm?.wakeRange} />}
                   </div>
                 )}
                 <div className={s.event}>
@@ -684,6 +698,7 @@ function Timeline({
                       <p className={s.sleepCalculation}>Спал {prev.continuation ? "ещё " : ""}{duration(minutes(prev.at, e.at))}</p>
                     )}
                     {summary && !day.events[i + 1]?.continuation && <p className={s.sleepCalculation}>Итого: сон {duration(summary.sleep)}, перерыв {duration(summary.awake)}</p>}
+                    {prev?.kind === "sleep" && !day.events[i + 1]?.continuation && <NormBadge subject="Дневной сон" value={summary?.sleep ?? minutes(prev.at, e.at)} range={napRange} />}
                     {e.comment && <div className={s.eventComment}><span>Комментарий</span><p>{e.comment}</p></div>}
                     <button
                       className={s.commentButton}
@@ -719,6 +734,7 @@ function DayPage({ initialDate }: { initialDate?: string }) {
   const days = useDiary((x) => x.days),
     birth = useDiary((x) => x.birthDate);
   const day = days[date];
+  const age = ageMonths(birth, date);
   const last = day?.events.at(-1);
   const now = useNow();
   const [eventModal, setEventModal] = useState<{
@@ -876,8 +892,8 @@ function DayPage({ initialDate }: { initialDate?: string }) {
                         : isNight
                           ? `Уснул в ${timeInput(last.at)}. Ночь можно заполнить утром.`
                           : sleeping
-                            ? `Уснул в ${timeInput(last.at)}. Пусть отдых будет спокойным.`
-                            : `Проснулся в ${timeInput(last.at)}. Впереди маленькие открытия.`}
+                            ? `Уснул в ${timeInput(last.at)}.`
+                            : `Проснулся в ${timeInput(last.at)}.`}
                     </p>
                   </>
                 )}
@@ -915,7 +931,7 @@ function DayPage({ initialDate }: { initialDate?: string }) {
                   </div>
                 )}
               </div>
-              <CloudArt />
+              {!last && <CloudArt />}
             </div>
             {last?.kind === "wake" && (
               <PlanForm key={last.id} day={day} last={last} />
@@ -933,9 +949,10 @@ function DayPage({ initialDate }: { initialDate?: string }) {
               </div>
             )}
           </section>
-          <Stats day={day} next={next} now={now} />
+          <Stats day={day} next={next} now={now} age={age} />
           <Timeline
             day={day}
+            age={age}
             onEdit={(event) => setEventModal({ kind: event.kind, event })}
             onUndo={() => {
               setUndoError("");
