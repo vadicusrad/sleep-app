@@ -815,6 +815,16 @@ h1 {
 .eventTime svg {
   opacity: 0.4;
 }
+.eventTimes { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; margin-top: 2px; }
+.eventTimes .eventTime { min-height: 44px; padding: 4px 2px; }
+.eventTimes .eventTime svg { opacity: .8; }
+.timeDash, .timePending { color: #78876b; font-size: 14px; }
+.timelineCopy { display: grid; place-items: center; width: 40px; min-height: 40px; border-radius: 10px; background: #eef3e9; color: #536e4b; flex-shrink: 0; }
+.timelineCopy:disabled { opacity: .45; }
+.dayHeading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 16px; margin-bottom: 16px; }
+.dayHeadingText { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 12px; }
+.dayHeading h1 { font-size: 26px; letter-spacing: -.5px; }
+.dayAge { color: #68775f; font-size: 14px; }
 .between {
   display: flex;
   align-items: center;
@@ -2273,6 +2283,8 @@ tbody tr:last-child td {
 :global([data-theme="dark"]) .app .statIndicatorWithin { color: #bde0ba; }
 :global([data-theme="dark"]) .app .statIndicatorOutside { color: #ffd09a; }
 :global([data-theme="dark"]) .app .periodHint { color: #ead1b6; }
+:global([data-theme="dark"]) .app :is(.dayAge, .timeDash, .timePending) { color: #d2dfcd; }
+:global([data-theme="dark"]) .app .timelineCopy { background: #405443; color: #edf2e9; }
 :global([data-theme="dark"]) .app .eventComment :is(span, p) { color: #f0e5d1; }
 :global([data-theme="dark"]) .app .timeline .eventText > .sleepCalculation { color: #cfe3c5; }
 :global([data-theme="dark"]) .app :is(.timelineItem::after, .betweenLine) { background: #536453; }

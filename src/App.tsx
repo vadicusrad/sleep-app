@@ -617,10 +617,12 @@ function Timeline({
   day,
   onEdit,
   onUndo,
+  onCopy,
 }: {
   day?: DayRecord;
   onEdit: (e: SleepEvent) => void;
   onUndo: () => void;
+  onCopy: () => void;
 }) {
   return (
     <section className={s.card}>
@@ -629,7 +631,7 @@ function Timeline({
           <h2>Ритм дня</h2>
           {!day?.events.length && <p>Маленькие события большого дня</p>}
         </div>
-        <span className={s.pill}>{day?.events.length ?? 0} событий</span>
+        <button className={s.timelineCopy} disabled={!day?.events.length} onClick={onCopy} aria-label="Скопировать дневник" title="Скопировать дневник"><Icon name="copy" size={19} /></button>
       </div>
       {!day?.events.length ? (
         <div className={s.emptyTimeline}>
@@ -652,8 +654,10 @@ function Timeline({
         <div className={s.timeline}>
           {day.events.map((e, i) => {
             const prev = day.events[i - 1];
+            if (e.kind === "wake" && prev?.kind === "sleep") return null;
             const isSleep = e.kind === "sleep" || e.kind === "night";
-            const summary = napSummary(day.events, i);
+            const wake = e.kind === "sleep" && day.events[i + 1]?.kind === "wake" ? day.events[i + 1] : undefined;
+            const summary = wake ? napSummary(day.events, i + 1) : null;
             return (
               <div key={e.id} className={s.timelineItem}>
                 {prev?.kind === "wake" && (
@@ -677,31 +681,24 @@ function Timeline({
                         ? "Уснул на ночь"
                         : e.kind === "sleep"
                           ? e.continuation ? `Продолжение ${napNumber(day.events, i)}-го сна` : `${napNumber(day.events, i)}-й дневной сон`
-                          : i === 0
-                            ? "Утренний подъем"
-                            : "Проснулся"}
+                          : "Утренний подъем"}
                     </h3>
-                    {prev?.kind === "sleep" && (
-                      <p className={s.sleepCalculation}>Спал {prev.continuation ? "ещё " : ""}{duration(minutes(prev.at, e.at))}</p>
-                    )}
-                    {summary && !day.events[i + 1]?.continuation && <p className={s.sleepCalculation}>Итого: сон {duration(summary.sleep)}, перерыв {duration(summary.awake)}</p>}
-                    {e.comment && <div className={s.eventComment}><span>Комментарий</span><p>{e.comment}</p></div>}
-                    <button
-                      className={s.commentButton}
-                      onClick={() => onEdit(e)}
-                    >
-                      <Icon name={e.comment ? "edit" : "message"} size={13} />
-                      {e.comment ? "Изменить комментарий" : "Добавить комментарий"}
-                    </button>
+                    <div className={s.eventTimes}>
+                      <button className={s.eventTime} onClick={() => onEdit(e)} aria-label={`${e.kind === "sleep" ? "Изменить засыпание" : "Изменить событие"} ${timeInput(e.at)}`}>
+                        {timeInput(e.at)}<Icon name="edit" size={13} />
+                      </button>
+                      {e.kind === "sleep" && <>
+                        <span className={s.timeDash}>—</span>
+                        {wake ? <button className={s.eventTime} onClick={() => onEdit(wake)} aria-label={`Изменить пробуждение ${timeInput(wake.at)}`}>
+                          {timeInput(wake.at)}<Icon name="edit" size={13} />
+                        </button> : <span className={s.timePending}>спит</span>}
+                      </>}
+                    </div>
+                    {wake && <p className={s.sleepCalculation}>Спал {e.continuation ? "ещё " : ""}{duration(minutes(e.at, wake.at))}</p>}
+                    {summary && !day.events[i + 2]?.continuation && <p className={s.sleepCalculation}>Итого: сон {duration(summary.sleep)}, перерыв {duration(summary.awake)}</p>}
+                    {e.comment && <div className={s.eventComment}><span>{wake ? "При засыпании" : "Комментарий"}</span><p>{e.comment}</p></div>}
+                    {wake?.comment && <div className={s.eventComment}><span>При пробуждении</span><p>{wake.comment}</p></div>}
                   </div>
-                  <button
-                    className={s.eventTime}
-                    onClick={() => onEdit(e)}
-                    aria-label={`Изменить событие ${timeInput(e.at)}`}
-                  >
-                    {timeInput(e.at)}
-                    <Icon name="edit" size={13} />
-                  </button>
                 </div>
               </div>
             );
@@ -773,11 +770,10 @@ function DayPage({ initialDate }: { initialDate?: string }) {
   }
   return (
     <>
-      <div className={s.pageHeading}>
-        <div>
-          <div className={s.kicker}>ДНЕВНИК СНА МАЛЫША</div>
-          <h1>{date === dateKey() ? "Сегодня" : dateLabel(date)}</h1>
-          <p>Меньше подсчетов. Больше спокойствия.</p>
+      <div className={s.dayHeading}>
+        <div className={s.dayHeadingText}>
+          <h1>{date === todayKey ? "Сегодня" : dateLabel(date)}</h1>
+          {birth && ageInWeeks(birth, todayKey) !== null && <span className={s.dayAge}>{ageLabel(birth, todayKey)} ({ageInWeeks(birth, todayKey)} нед.)</span>}
         </div>
         <div className={s.dateSwitcher}>
           <button
@@ -938,6 +934,7 @@ function DayPage({ initialDate }: { initialDate?: string }) {
           <Stats day={day} next={next} now={now} age={age} />
           <Timeline
             day={day}
+            onCopy={copy}
             onEdit={(event) => setEventModal({ kind: event.kind, event })}
             onUndo={() => {
               setUndoError("");
@@ -986,34 +983,6 @@ function DayPage({ initialDate }: { initialDate?: string }) {
               <small>Станет доступно после отметки «На ночь»</small>
             )}
           </section>
-          <section className={s.gentleNote}>
-            <Icon name="leaf" size={24} />
-            <h3>
-              У каждого малыша
-              <br />
-              свой ритм
-            </h3>
-            <p>
-              Короткий сон, долгое укладывание — просто часть дня. Отмечайте,
-              наблюдайте и находите свой ритм.
-            </p>
-            <Link to="/norms">
-              Ориентиры по возрасту
-              <Icon name="arrow" size={15} />
-            </Link>
-          </section>
-          <button
-            className={s.copyButton}
-            disabled={!day?.events.length}
-            onClick={copy}
-          >
-            <Icon name="copy" size={17} />
-            Скопировать дневник
-          </button>
-          <div className={s.localNote}>
-            <Icon name="check" size={14} />
-            Все записи только на вашем устройстве
-          </div>
         </aside>
       </div>
       {eventModal && (
@@ -1482,15 +1451,6 @@ interface InstallEvent extends Event {
 }
 export default function App() {
   const [calculatorRows, setCalculatorRows] = useState<CalculatorRow[]>(() => [newCalculatorRow(), newCalculatorRow()]);
-  const birth = useDiary((x) => x.birthDate);
-  const [today, setToday] = useState(dateKey);
-  useEffect(() => {
-    const updateDate = () => setToday(dateKey());
-    const timer = setInterval(updateDate, 60000);
-    window.addEventListener("focus", updateDate);
-    return () => { clearInterval(timer); window.removeEventListener("focus", updateDate); };
-  }, []);
-  const weeks = ageInWeeks(birth, today);
   const theme = useDiary((x) => x.theme);
   useLayoutEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -1551,34 +1511,8 @@ export default function App() {
             </NavLink>
           ))}
         </nav>
-        <div className={s.sidebarBottom}>
-          <div className={s.sidebarIllustration}>
-            <Icon name="leaf" size={30} />
-            <span>
-              В своем ритме.
-              <br />С вашей любовью.
-            </span>
-          </div>
-          <div className={s.sidebarLocal}>
-            <i />
-            Сохранено на устройстве
-          </div>
-        </div>
       </aside>
       <div className={s.workspace}>
-        <header className={s.topbar}>
-          <span className={s.topbarTitle}>
-            <Icon name="leaf" size={17} />
-            Пусть день будет спокойным
-          </span>
-          <Link to="/settings" className={s.childChip}>
-            <span className={s.childAvatar}>
-              <Icon name="heart" size={17} />
-            </span>
-            {weeks !== null ? `${ageLabel(birth, today)} (${weeks} нед.)` : "Ваш малыш"}
-            <Icon name="chevron" size={14} />
-          </Link>
-        </header>
         <main className={s.main}>
           {issue && (
             <div className={s.storageError} role="alert">
@@ -1620,9 +1554,6 @@ export default function App() {
               }
             />
           </Routes>
-          <footer className={s.footer}>
-            Один сон за раз <span>✦</span> Сны Ромы
-          </footer>
         </main>
       </div>
       <nav className={s.mobileNav}>
