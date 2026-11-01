@@ -614,12 +614,10 @@ function Timeline({
   day,
   onEdit,
   onUndo,
-  onNote,
 }: {
   day?: DayRecord;
   onEdit: (e: SleepEvent) => void;
   onUndo: () => void;
-  onNote: () => void;
 }) {
   return (
     <section className={s.card}>
@@ -710,11 +708,6 @@ function Timeline({
           </button>
         </div>
       )}
-      <button className={s.noteButton} onClick={onNote}>
-        <Icon name="message" size={18} />
-        <span>{day?.note || "Добавить заметку о дне"}</span>
-        <Icon name={day?.note ? "edit" : "plus"} size={17} />
-      </button>
     </section>
   );
 }
@@ -824,6 +817,11 @@ function DayPage({ initialDate }: { initialDate?: string }) {
       )}
       <div className={s.dayColumns}>
         <div className={s.mainColumn}>
+          <button className={`${s.noteButton} ${s.dayNote}`} onClick={() => setNote(true)}>
+            <Icon name="message" size={20} />
+            <span><strong>Заметка дня</strong><span>{day?.note || "Добавить заметку о дне"}</span></span>
+            <Icon name={day?.note ? "edit" : "plus"} size={18} />
+          </button>
           <section
             className={`${s.statusCard} ${sleeping || isNight ? s.statusSleeping : ""}`}
           >
@@ -941,7 +939,6 @@ function DayPage({ initialDate }: { initialDate?: string }) {
               setUndoError("");
               setUndo(true);
             }}
-            onNote={() => setNote(true)}
           />
         </div>
         <aside className={s.rightColumn}>
