@@ -5,6 +5,8 @@ import {
   diaryText,
   duration,
   minutes,
+  napSummary,
+  napNumber,
   nightError,
   nightStats,
   timestamp,
@@ -50,6 +52,27 @@ const day: DayRecord = {
   night: { rows, complete: true },
 };
 describe("время и фактические итоги", () => {
+  it("объединяет продления, сохраняя перерывы в суммарном бодрствовании", () => {
+    const d: DayRecord = { ...day, events: [
+      { id: "1", kind: "wake", at: at(day.date, "14:00"), comment: "" },
+      { id: "2", kind: "sleep", at: at(day.date, "14:37"), comment: "" },
+      { id: "3", kind: "wake", at: at(day.date, "15:16"), comment: "" },
+      { id: "4", kind: "sleep", at: at(day.date, "15:44"), comment: "", continuation: true },
+      { id: "5", kind: "wake", at: at(day.date, "15:58"), comment: "" },
+      { id: "6", kind: "sleep", at: at(day.date, "16:08"), comment: "", continuation: true },
+      { id: "7", kind: "wake", at: at(day.date, "16:13"), comment: "" },
+      { id: "8", kind: "sleep", at: at(day.date, "17:00"), comment: "" },
+      { id: "9", kind: "wake", at: at(day.date, "17:30"), comment: "" },
+      { id: "10", kind: "night", at: at(day.date, "19:23"), comment: "" },
+    ] };
+    expect(validateEvents(d.events)).toBeNull();
+    expect(napSummary(d.events, 4)).toEqual({ sleep: 53, awake: 28 });
+    expect(napSummary(d.events, 6)).toEqual({ sleep: 58, awake: 38 });
+    expect(napNumber(d.events, 7)).toBe(2);
+    expect(dayStats(d)).toMatchObject({ sleep: 88, awake: 235, naps: 2 });
+    expect(diaryText(d)).toContain("Итого сон 58 мин, перерыв 38 мин");
+    expect(validateEvents([d.events[0], { ...d.events[1], continuation: true }])).toContain("предыдущий");
+  });
   it("рассчитывает ближайший сон и отличает реальное ВБ", () => {
     expect(duration(195)).toBe("3 ч 15 мин");
     expect(new Date(at("2026-10-23", "06:50") + 195 * 60000).getHours()).toBe(

@@ -5,6 +5,7 @@ export interface SleepEvent {
   at: number;
   comment: string;
   plannedMinutes?: number;
+  continuation?: boolean;
 }
 export interface NightRow {
   id: string;
@@ -77,6 +78,8 @@ export function validateEvents(
 ): string | null {
   for (let i = 0; i < events.length; i++) {
     const e = events[i];
+    if (e.continuation && (e.kind !== "sleep" || events[i - 1]?.kind !== "wake" || events[i - 2]?.kind !== "sleep"))
+      return "Продолжить можно только предыдущий дневной сон.";
     if (!Number.isFinite(e.at)) return "Укажите корректное время.";
     if (e.at > now + 60000)
       return "Фактическое событие не может быть в будущем.";
@@ -157,7 +160,7 @@ export function dayStats(day?: DayRecord, now = Date.now()) {
       const end = next?.at ?? now;
       if (e.kind === "sleep") {
         sleep += minutes(e.at, end);
-        naps++;
+        if (!e.continuation) naps++;
       } else awake += minutes(e.at, end);
     }
   return {
@@ -166,6 +169,21 @@ export function dayStats(day?: DayRecord, now = Date.now()) {
     naps,
     night: day ? nightStats(day.night.rows).sleep : 0,
   };
+}
+export function napNumber(events: SleepEvent[], index: number) {
+  return events.slice(0, index + 1).filter((e) => e.kind === "sleep" && !e.continuation).length;
+}
+export function napSummary(events: SleepEvent[], wakeIndex: number) {
+  let start = wakeIndex - 1;
+  if (events[wakeIndex]?.kind !== "wake" || events[start]?.kind !== "sleep") return null;
+  while (events[start]?.continuation && start >= 2) start -= 2;
+  if (start === wakeIndex - 1) return null;
+  let sleep = 0, awake = 0;
+  for (let i = start; i < wakeIndex; i++) {
+    if (events[i].kind === "sleep") sleep += minutes(events[i].at, events[i + 1].at);
+    else awake += minutes(events[i].at, events[i + 1].at);
+  }
+  return { sleep, awake };
 }
 export function diaryText(day: DayRecord, next?: DayRecord) {
   const stats = dayStats(day),
@@ -177,14 +195,16 @@ export function diaryText(day: DayRecord, next?: DayRecord) {
   day.events.forEach((e, i) => {
     const prev = day.events[i - 1];
     if (prev?.kind === "wake")
-      lines.push(`ВБ ${duration(minutes(prev.at, e.at))}`);
+      lines.push(`${e.continuation ? "Бодрствование при продлении" : "ВБ"} ${duration(minutes(prev.at, e.at))}`);
     const nap =
       e.kind === "sleep"
-        ? day.events.slice(0, i + 1).filter((x) => x.kind === "sleep").length
+        ? napNumber(day.events, i)
         : 0;
     lines.push(
-      `${e.kind === "night" ? "НС" : e.kind === "sleep" ? `${nap} ДС — уснул` : i === 0 ? "Подъем" : "Проснулся"} ${timeInput(e.at)}${e.kind === "wake" && prev?.kind === "sleep" ? ` (сон ${duration(minutes(prev.at, e.at))})` : ""}${e.comment ? ` — ${e.comment}` : ""}`,
+      `${e.kind === "night" ? "НС" : e.kind === "sleep" ? e.continuation ? `Продолжение ${nap} ДС` : `${nap} ДС — уснул` : i === 0 ? "Подъем" : "Проснулся"} ${timeInput(e.at)}${e.kind === "wake" && prev?.kind === "sleep" ? ` (сон ${duration(minutes(prev.at, e.at))})` : ""}${e.comment ? ` — ${e.comment}` : ""}`,
     );
+    const summary = napSummary(day.events, i);
+    if (summary && !day.events[i + 1]?.continuation) lines.push(`Итого сон ${duration(summary.sleep)}, перерыв ${duration(summary.awake)}`);
   });
   lines.push(
     `СДС ${duration(stats.sleep)}`,

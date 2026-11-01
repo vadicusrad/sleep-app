@@ -29,6 +29,20 @@ beforeEach(() => {
   useDiary.setState({ birthDate: "", days: {}, lastWake: null });
 });
 describe("журнал и сохранение", () => {
+  it("позволяет исправить старую запись и сохраняет продление после перезагрузки", () => {
+    add("2026-10-23", "wake", "07:00");
+    add("2026-10-23", "sleep", "14:37");
+    add("2026-10-23", "wake", "15:16");
+    add("2026-10-23", "sleep", "15:44");
+    const event = useDiary.getState().days["2026-10-23"].events[3];
+    expect(useDiary.getState().editEvent("2026-10-23", event.id, { continuation: true })).toBeNull();
+    const saved = memory.get(STORAGE_KEY)!;
+    useDiary.setState({ days: {} });
+    memory.set(STORAGE_KEY, saved);
+    useDiary.persist.rehydrate();
+    expect(useDiary.getState().days["2026-10-23"].events[3].continuation).toBe(true);
+    expect(useDiary.getState().editEvent("2026-10-23", event.id, { continuation: false })).toBeNull();
+  });
   it("сохраняет факты и план независимо и восстанавливает данные", () => {
     add("2026-10-23", "wake", "06:50");
     const event = useDiary.getState().days["2026-10-23"].events[0];

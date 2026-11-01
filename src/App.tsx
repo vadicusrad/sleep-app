@@ -13,6 +13,8 @@ import {
   duration,
   localDateTime,
   minutes,
+  napNumber,
+  napSummary,
   nightStats,
   shiftDate,
   timeInput,
@@ -131,12 +133,14 @@ function EventForm({
   date,
   event,
   kind,
+  continuation = false,
   onClose,
   onSaved,
 }: {
   date: string;
   event?: SleepEvent;
   kind: EventKind;
+  continuation?: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -145,6 +149,10 @@ function EventForm({
     event ? dateKey(new Date(event.at)) : date,
   );
   const [comment, setComment] = useState(event?.comment ?? "");
+  const [isContinuation, setIsContinuation] = useState(event?.continuation ?? continuation);
+  const events = useDiary((x) => x.days[date]?.events);
+  const eventIndex = event ? events?.findIndex((e) => e.id === event.id) ?? -1 : events?.length ?? 0;
+  const canContinue = kind === "sleep" && events?.[eventIndex - 1]?.kind === "wake" && events?.[eventIndex - 2]?.kind === "sleep";
   const [error, setError] = useState("");
   const add = useDiary((x) => x.addEvent),
     edit = useDiary((x) => x.editEvent);
@@ -152,14 +160,14 @@ function EventForm({
     kind === "night"
       ? "Уснул на ночь"
       : kind === "sleep"
-        ? "Малыш уснул"
+        ? continuation ? "Малыш заснул снова" : "Малыш уснул"
         : "Малыш проснулся";
   function submit(e: FormEvent) {
     e.preventDefault();
     const at = timestamp(eventDate, time);
     const err = event
-      ? edit(date, event.id, { at, comment })
-      : add(date, { kind, at, comment });
+      ? edit(date, event.id, { at, comment, ...(canContinue ? { continuation: isContinuation } : {}) })
+      : add(date, { kind, at, comment, ...(isContinuation ? { continuation: true } : {}) });
     if (err) setError(err);
     else {
       onSaved();
@@ -169,7 +177,7 @@ function EventForm({
   return (
     <Modal
       title={event ? "Изменить событие" : title}
-      description="Укажите фактическое время. Его всегда можно поправить."
+      description={continuation && !event ? "Укажите время, когда малыш снова заснул. Перерыв будет учтён как бодрствование." : "Укажите фактическое время. Его всегда можно поправить."}
       onClose={onClose}
     >
       <form onSubmit={submit} className={s.form}>
@@ -196,6 +204,15 @@ function EventForm({
             />
           </label>
         </div>
+        {event && canContinue && (
+          <label>
+            Отнести засыпание к
+            <select value={isContinuation ? "continuation" : "new"} onChange={(e) => setIsContinuation(e.target.value === "continuation")}>
+              <option value="new">Новому дневному сну</option>
+              <option value="continuation">Продолжению предыдущего сна</option>
+            </select>
+          </label>
+        )}
         <label>
           Комментарий <span className={s.optional}>необязательно</span>
           <textarea
@@ -633,13 +650,14 @@ function Timeline({
           {day.events.map((e, i) => {
             const prev = day.events[i - 1];
             const isSleep = e.kind === "sleep" || e.kind === "night";
+            const summary = napSummary(day.events, i);
             return (
               <div key={e.id} className={s.timelineItem}>
                 {prev?.kind === "wake" && (
                   <div className={s.between}>
                     <span />
-                    {duration(minutes(prev.at, e.at))} бодрствования
-                    {prev.plannedMinutes !== undefined && (
+                    {e.continuation ? `Бодрствование при продлении · ${duration(minutes(prev.at, e.at))}` : `${duration(minutes(prev.at, e.at))} бодрствования`}
+                    {!e.continuation && prev.plannedMinutes !== undefined && (
                       <small>план {duration(prev.plannedMinutes)}</small>
                     )}
                   </div>
@@ -655,14 +673,15 @@ function Timeline({
                       {e.kind === "night"
                         ? "Уснул на ночь"
                         : e.kind === "sleep"
-                          ? `${day.events.slice(0, i + 1).filter((x) => x.kind === "sleep").length}-й дневной сон`
+                          ? e.continuation ? `Продолжение ${napNumber(day.events, i)}-го сна` : `${napNumber(day.events, i)}-й дневной сон`
                           : i === 0
                             ? "Утренний подъем"
                             : "Проснулся"}
                     </h3>
                     {prev?.kind === "sleep" && (
-                      <p>Спал {duration(minutes(prev.at, e.at))}</p>
+                      <p>Спал {prev.continuation ? "ещё " : ""}{duration(minutes(prev.at, e.at))}</p>
                     )}
+                    {summary && !day.events[i + 1]?.continuation && <p>Итого: сон {duration(summary.sleep)}, перерыв {duration(summary.awake)}</p>}
                     {e.comment && <p className={s.eventComment}>{e.comment}</p>}
                     <button
                       className={s.commentButton}
@@ -708,6 +727,7 @@ function DayPage({ initialDate }: { initialDate?: string }) {
   const [eventModal, setEventModal] = useState<{
       kind: EventKind;
       event?: SleepEvent;
+      continuation?: boolean;
     } | null>(null),
     [nightDate, setNightDate] = useState<string | null>(null),
     [note, setNote] = useState(false),
@@ -876,6 +896,11 @@ function DayPage({ initialDate }: { initialDate?: string }) {
                       {sleeping || !last ? "Проснулся" : "Уснул"}
                       <Icon name="arrow" size={18} />
                     </button>
+                    {last && !sleeping && (
+                      day.events.at(-2)?.kind === "sleep" && <button className={s.softButton} onClick={() => setEventModal({ kind: "sleep", continuation: true })}>
+                        <Icon name="moon" size={17} /> Заснул снова
+                      </button>
+                    )}
                     {last && !sleeping && (
                       <button
                         className={s.softButton}

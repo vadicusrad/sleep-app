@@ -37,6 +37,7 @@ function validState(v: unknown): boolean {
           typeof e.at === "number" &&
           Number.isFinite(e.at) &&
           typeof e.comment === "string" &&
+          (e.continuation === undefined || typeof e.continuation === "boolean") &&
           (e.plannedMinutes === undefined ||
             typeof e.plannedMinutes === "number"),
       ) &&
