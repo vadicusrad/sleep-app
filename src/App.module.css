@@ -2154,3 +2154,41 @@ tbody tr:last-child td {
 .backupActions .outlineButton { font-size: 14px; }
 .backupConfirm { display: flex; flex-direction: column; gap: 15px; padding: 20px 26px 26px; }
 .backupConfirm p { margin: 0; }
+.themeCard { margin-top: 20px; padding: 25px; }
+.themeCard h2 { font-size: 20px; font-weight: 550; }
+.themeCard p { margin-top: 10px; color: #607058; font-size: 14px; }
+.themeChoices { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.themeChoice { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 10px 16px; border: 1px solid #cbd5c2; border-radius: 10px; background: #fffefa; color: #526b49; font-size: 14px; }
+.themeChoice[aria-pressed="true"] { border-color: #657e58; background: #e9f0e3; color: #354d34; font-weight: 650; }
+
+:global([data-theme="dark"]) .app { color: #edf2e9; }
+:global([data-theme="dark"]) .app :is(h1, h2, h3, h4, p, small, label, th, td) { color: #dce6d9; }
+:global([data-theme="dark"]) .app :is(.sidebar, .topbar, .card, .stat, .dateSwitcher, .historyDay, .noteButton, .modal) {
+  background: #242e27; border-color: #435145; color: #edf2e9;
+}
+:global([data-theme="dark"]) .app :is(.statusCard, .nightCard, .totalStat, .nightRow, .infoBanner, .ageDisplay, .installHint, .sidebarIllustration) {
+  background: #303d32; border-color: #4b5c4c; color: #e3ece0;
+}
+:global([data-theme="dark"]) .app :is(.planForm, .planResult, .nightSummary, .pill, .emptyIcon, .resultIcon, .roundIcon, .logo, .childAvatar) {
+  background: #39493b; border-color: #536653; color: #e1eddd;
+}
+:global([data-theme="dark"]) .app :is(.navLink, .eventTime, .commentButton, .between, .dateLabel, .undoButton, .copyButton, .textButton, .backButton, .outlineButton, .softButton, .mobileNav a) { color: #cbdcc4; }
+:global([data-theme="dark"]) .app :is(.stat > span, .stat strong, .stat small, .sidebarIllustration span, .sidebarLocal, .topbarTitle, .childChip, .statusDate, .statusBadge, .kicker, .eyebrow, .localNote, .footer, .footer span, .historyNight, .historyDate b, .historyDate > span) { color: #c2d2bc; }
+:global([data-theme="dark"]) .app :is(.navActive, .mobileActive, .softButton, .themeChoice[aria-pressed="true"]) { background: #405443; border-color: #82a07d; color: #f1f7ee; }
+:global([data-theme="dark"]) .app :is(.themeChoice, .nightRow textarea, .durationFields input) { background: #202a23; border-color: #536453; color: #e6f0e3; }
+:global([data-theme="dark"]) .app .primary { background: #75916b; color: #101a10; }
+:global([data-theme="dark"]) .app :is(.eventDot, .sleepDot) { background: #405443; color: #d6e7c9; }
+:global([data-theme="dark"]) .app .eventText .eventComment { background: #443d31; border-color: #c1a873; color: #f0e5d1; }
+:global([data-theme="dark"]) .app .eventComment :is(span, p) { color: #f0e5d1; }
+:global([data-theme="dark"]) .app .timeline .eventText > .sleepCalculation { color: #cfe3c5; }
+:global([data-theme="dark"]) .app :is(.timelineItem::after, .between > span) { background: #536453; }
+:global([data-theme="dark"]) .app :is(.tableScroll th:first-child, th) { background: #354437; }
+:global([data-theme="dark"]) .app .tableScroll td:first-child { background: #242e27; }
+:global([data-theme="dark"]) .app :is(td, th, .modalHead, .nightSummary, .noteButton, .timeline, .historyDate, .topbar, .sidebar) { border-color: #465448; }
+:global([data-theme="dark"]) .app :is(.error, .storageError) { background: #4d302b; color: #ffe2d9; border-color: #8b5b50; }
+:global([data-theme="dark"]) .app .updateBanner { background: #3d513d; color: #edf6e9; }
+:global([data-theme="dark"]) .app .updateBanner button { background: #779573; color: #101a10; }
+:global([data-theme="dark"]) .app .art { opacity: .38; }
+@media (max-width: 700px) {
+  :global([data-theme="dark"]) .app .mobileNav { background: #242e27ed; border-color: #435145; }
+}

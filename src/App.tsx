@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { NavLink, Link, Route, Routes, useLocation } from "react-router";
 import { registerSW } from "virtual:pwa-register";
@@ -1254,6 +1254,8 @@ function Settings({
 }) {
   const birth = useDiary((x) => x.birthDate),
     save = useDiary((x) => x.setBirth);
+  const theme = useDiary((x) => x.theme);
+  const setTheme = useDiary((x) => x.setTheme);
   const [date, setDate] = useState(birth),
     [saved, setSaved] = useState(false),
     [error, setError] = useState("");
@@ -1385,6 +1387,14 @@ function Settings({
           </div>
         </section>
       </div>
+      <section className={`${s.card} ${s.themeCard}`}>
+        <h2>Тема оформления</h2>
+        <p>Выберите удобный вид приложения.</p>
+        <div className={s.themeChoices} role="group" aria-label="Тема оформления">
+          <button type="button" className={s.themeChoice} aria-pressed={theme === "light"} onClick={() => setTheme("light")}><Icon name="sun" size={19} /> Светлая</button>
+          <button type="button" className={s.themeChoice} aria-pressed={theme === "dark"} onClick={() => setTheme("dark")}><Icon name="moon" size={19} /> Тёмная</button>
+        </div>
+      </section>
       <section className={`${s.card} ${s.backupCard}`}>
         <h2>Копия дневника</h2>
         <p>Сохраните всю историю, комментарии и настройки в файл, чтобы перенести их в другой браузер или восстановить позже.</p>
@@ -1433,6 +1443,11 @@ interface InstallEvent extends Event {
 }
 export default function App() {
   const birth = useDiary((x) => x.birthDate);
+  const theme = useDiary((x) => x.theme);
+  useLayoutEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#171d19" : "#f7f8f2");
+  }, [theme]);
   const [issue, setIssue] = useState(storageIssue());
   const [update, setUpdate] = useState<
     ((reload?: boolean) => Promise<void>) | null

@@ -15,6 +15,7 @@ export interface DiaryData {
   birthDate: string;
   lastWake: number | null;
   days: Record<string, DayRecord>;
+  theme?: "light" | "dark";
 }
 const object = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === "object";
@@ -23,6 +24,7 @@ function validState(v: unknown): boolean {
     !object(v) ||
     !object(v.days) ||
     typeof v.birthDate !== "string" ||
+    !(v.theme === undefined || v.theme === "light" || v.theme === "dark") ||
     !(v.lastWake === null || typeof v.lastWake === "number")
   )
     return false;
@@ -61,8 +63,8 @@ function validState(v: unknown): boolean {
 
 export function exportDiary(): string {
   if (blocked) throw new Error("Не удалось прочитать исходный дневник. Экспорт недоступен, чтобы не сохранить пустую копию.");
-  const { birthDate, lastWake, days } = useDiary.getState();
-  return JSON.stringify({ format: "quiet-hour-backup", version: 1, data: { birthDate, lastWake, days } }, null, 2);
+  const { birthDate, lastWake, days, theme } = useDiary.getState();
+  return JSON.stringify({ format: "quiet-hour-backup", version: 1, data: { birthDate, lastWake, days, theme } }, null, 2);
 }
 
 export function parseDiaryBackup(raw: string): DiaryData {
@@ -84,12 +86,13 @@ export function parseDiaryBackup(raw: string): DiaryData {
 
 export function importDiary(data: DiaryData): string | null {
   if (blocked) return "Исходный дневник недоступен. Импорт остановлен, чтобы не перезаписать его.";
+  const restored = { ...data, theme: data.theme ?? useDiary.getState().theme };
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ state: data, version: 1 }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ state: restored, version: 1 }));
   } catch {
     return "Не удалось сохранить дневник на устройстве. Проверьте свободное место и повторите попытку.";
   }
-  useDiary.setState(data);
+  useDiary.setState(restored);
   return null;
 }
 const storage = {
@@ -128,6 +131,8 @@ const storage = {
   },
 };
 interface AppState {
+  theme: "light" | "dark";
+  setTheme: (theme: "light" | "dark") => void;
   birthDate: string;
   lastWake: number | null;
   days: Record<string, DayRecord>;
@@ -153,6 +158,8 @@ const blank = (date: string): DayRecord => ({
 export const useDiary = create<AppState>()(
   persist(
     (set, get) => ({
+      theme: "light",
+      setTheme: (theme) => set({ theme }),
       birthDate: "",
       lastWake: null,
       days: {},
@@ -348,6 +355,7 @@ export const useDiary = create<AppState>()(
         birthDate: s.birthDate,
         lastWake: s.lastWake,
         days: s.days,
+        theme: s.theme,
       }),
     },
   ),

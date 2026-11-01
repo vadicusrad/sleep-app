@@ -26,9 +26,24 @@ const add = (d: string, k: "wake" | "sleep" | "night", t: string) =>
     .addEvent(d, { kind: k, at: timestamp(d, t), comment: "" });
 beforeEach(() => {
   memory.clear();
-  useDiary.setState({ birthDate: "", days: {}, lastWake: null });
+  useDiary.setState({ birthDate: "", days: {}, lastWake: null, theme: "light" });
 });
 describe("журнал и сохранение", () => {
+  it("сохраняет тему и переносит её вместе с дневником, поддерживая старые копии", () => {
+    useDiary.getState().setTheme("dark");
+    const backup = parseDiaryBackup(exportDiary());
+    expect(backup.theme).toBe("dark");
+    const saved = memory.get(STORAGE_KEY)!;
+    useDiary.setState({ theme: "light" });
+    memory.set(STORAGE_KEY, saved);
+    useDiary.persist.rehydrate();
+    expect(useDiary.getState().theme).toBe("dark");
+    const { theme: _, ...oldBackup } = backup;
+    expect(importDiary(oldBackup)).toBeNull();
+    expect(useDiary.getState().theme).toBe("dark");
+    expect(importDiary({ ...backup, theme: "light" })).toBeNull();
+    expect(useDiary.getState().theme).toBe("light");
+  });
   it("переносит весь дневник, планы, комментарии и черновик ночи", () => {
     add("2026-10-23", "wake", "07:00");
     const wake = useDiary.getState().days["2026-10-23"].events[0];
