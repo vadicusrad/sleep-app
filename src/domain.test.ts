@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import {
   ageLabel,
+  ageInWeeks,
   dayStats,
   diaryText,
   duration,
@@ -128,6 +129,12 @@ describe("время и фактические итоги", () => {
     expect(ageLabel("2026-01-31", "2026-02-28")).toBe("1 мес.");
     expect(ageLabel("2026-01-31", "2026-03-01")).toBe("1 мес. 1 дн.");
     expect(ageLabel("2026-10-01", "2026-09-30")).toBe("");
+  });
+  it("считает полные недели по календарным датам", () => {
+    expect(ageInWeeks("2026-01-01", "2026-01-07")).toBe(0);
+    expect(ageInWeeks("2026-01-01", "2026-01-08")).toBe(1);
+    expect(ageInWeeks("2026-03-01", "2026-04-01")).toBe(4);
+    expect(ageInWeeks("2026-10-01", "2026-09-30")).toBeNull();
   });
   it("копирует факты и комментарии, без выдуманной полной ночи", () => {
     const next = {

@@ -7,6 +7,7 @@ import { useDiary, storageIssue, exportDiary, parseDiaryBackup, importDiary } fr
 import type { DiaryData } from "./store";
 import {
   ageLabel,
+  ageInWeeks,
   dateKey,
   dateLabel,
   dayStats,
@@ -1443,6 +1444,14 @@ interface InstallEvent extends Event {
 }
 export default function App() {
   const birth = useDiary((x) => x.birthDate);
+  const [today, setToday] = useState(dateKey);
+  useEffect(() => {
+    const updateDate = () => setToday(dateKey());
+    const timer = setInterval(updateDate, 60000);
+    window.addEventListener("focus", updateDate);
+    return () => { clearInterval(timer); window.removeEventListener("focus", updateDate); };
+  }, []);
+  const weeks = ageInWeeks(birth, today);
   const theme = useDiary((x) => x.theme);
   useLayoutEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -1527,7 +1536,7 @@ export default function App() {
             <span className={s.childAvatar}>
               <Icon name="heart" size={17} />
             </span>
-            {birth ? ageLabel(birth) : "Ваш малыш"}
+            {weeks !== null ? `${ageLabel(birth, today)} (${weeks} нед.)` : "Ваш малыш"}
             <Icon name="chevron" size={14} />
           </Link>
         </header>

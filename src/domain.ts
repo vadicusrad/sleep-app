@@ -72,6 +72,13 @@ export function ageLabel(birth: string, on = dateKey()) {
   );
   return `${months} мес.${days ? ` ${days} дн.` : ""}`;
 }
+export function ageInWeeks(birth: string, on = dateKey()): number | null {
+  if (!birth || birth > on) return null;
+  const start = Date.parse(`${birth}T00:00:00Z`);
+  const end = Date.parse(`${on}T00:00:00Z`);
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
+  return Math.floor((end - start) / (7 * 86400000));
+}
 export function validateEvents(
   events: SleepEvent[],
   now = Date.now(),
