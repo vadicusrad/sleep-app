@@ -65,6 +65,7 @@ describe("время и фактические итоги", () => {
     expect(sumDurations([{ hours: "2", minutes: "45" }, { hours: "1", minutes: "50", operation: "-" }, { hours: "0", minutes: "30", operation: "+" }])).toBe(85);
     expect(sumDurations([{ hours: "0", minutes: "15" }, { hours: "1", minutes: "00", operation: "-" }])).toBe(-45);
     expect(sumDurations([{ hours: "1", minutes: "00" }, { hours: "1", minutes: "00", operation: "-" }])).toBe(0);
+    expect(sumDurations([{ hours: "1", minutes: "15", operation: "-" }, { hours: "2", minutes: "00", operation: "+" }])).toBe(45);
   });
   it("объединяет продления, сохраняя перерывы в суммарном бодрствовании", () => {
     const d: DayRecord = { ...day, events: [

@@ -51,11 +51,11 @@ export function dayPeriodNotice(start: number, end: number): string | null {
 }
 export function sumDurations(rows: { hours: string; minutes: string; operation?: "+" | "-" }[]): number | null {
   let total = 0;
-  for (const [index, row] of rows.entries()) {
+  for (const row of rows) {
     if (!/^\d{0,6}$/.test(row.hours) || !/^\d{0,2}$/.test(row.minutes)) return null;
     const hours = Number(row.hours), mins = Number(row.minutes);
     if (mins > 59) return null;
-    total += (index > 0 && row.operation === "-" ? -1 : 1) * (hours * 60 + mins);
+    total += (row.operation === "-" ? -1 : 1) * (hours * 60 + mins);
   }
   return Number.isSafeInteger(total) ? total : null;
 }
