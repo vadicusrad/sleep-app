@@ -2147,3 +2147,10 @@ tbody tr:last-child td {
 .form label, .form input, .form textarea, .form select { font-size: 16px; }
 .planForm h3, .historyDay h3 { font-size: 16px; }
 .mobileNav a { font-size: 12px; }
+.backupCard { margin-top: 20px; padding: 25px; }
+.backupCard h2 { font-size: 20px; font-weight: 550; }
+.backupCard > p, .backupConfirm p { margin-top: 10px; color: #607058; font-size: 14px; line-height: 1.6; }
+.backupActions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+.backupActions .outlineButton { font-size: 14px; }
+.backupConfirm { display: flex; flex-direction: column; gap: 15px; padding: 20px 26px 26px; }
+.backupConfirm p { margin: 0; }

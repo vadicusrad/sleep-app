@@ -11,6 +11,11 @@ function notify(message: string) {
   window.dispatchEvent(new CustomEvent("storage-issue", { detail: message }));
 }
 export const storageIssue = () => initialIssue;
+export interface DiaryData {
+  birthDate: string;
+  lastWake: number | null;
+  days: Record<string, DayRecord>;
+}
 const object = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === "object";
 function validState(v: unknown): boolean {
@@ -52,6 +57,40 @@ function validState(v: unknown): boolean {
           ),
       ),
   );
+}
+
+export function exportDiary(): string {
+  if (blocked) throw new Error("Не удалось прочитать исходный дневник. Экспорт недоступен, чтобы не сохранить пустую копию.");
+  const { birthDate, lastWake, days } = useDiary.getState();
+  return JSON.stringify({ format: "quiet-hour-backup", version: 1, data: { birthDate, lastWake, days } }, null, 2);
+}
+
+export function parseDiaryBackup(raw: string): DiaryData {
+  let backup: unknown;
+  try { backup = JSON.parse(raw); } catch { throw new Error("Не удалось прочитать файл. Выберите файл экспорта дневника."); }
+  if (!object(backup) || backup.format !== "quiet-hour-backup" || backup.version !== 1 || !validState(backup.data))
+    throw new Error("Файл не похож на поддерживаемую копию дневника или содержит ошибки.");
+  const data = backup.data as DiaryData;
+  for (const day of Object.values(data.days)) {
+    if (validateEvents(day.events, Infinity))
+      throw new Error("В файле есть некорректные события. Дневник не изменён.");
+    if (day.events.length && dateKey(new Date(day.events[0].at)) !== day.date)
+      throw new Error("Дата событий в файле не совпадает с датой дня. Дневник не изменён.");
+    if (day.night.complete && (day.events.at(-1)?.kind !== "night" || nightError(day.night.rows, day.events.at(-1)?.at)))
+      throw new Error("В файле есть некорректные данные о ночи. Дневник не изменён.");
+  }
+  return data;
+}
+
+export function importDiary(data: DiaryData): string | null {
+  if (blocked) return "Исходный дневник недоступен. Импорт остановлен, чтобы не перезаписать его.";
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ state: data, version: 1 }));
+  } catch {
+    return "Не удалось сохранить дневник на устройстве. Проверьте свободное место и повторите попытку.";
+  }
+  useDiary.setState(data);
+  return null;
 }
 const storage = {
   getItem(name: string) {

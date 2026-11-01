@@ -3,7 +3,8 @@ import type { FormEvent, ReactNode } from "react";
 import { NavLink, Link, Route, Routes, useLocation } from "react-router";
 import { registerSW } from "virtual:pwa-register";
 import { Icon } from "./components/Icon";
-import { useDiary, storageIssue } from "./store";
+import { useDiary, storageIssue, exportDiary, parseDiaryBackup, importDiary } from "./store";
+import type { DiaryData } from "./store";
 import {
   ageLabel,
   dateKey,
@@ -1256,6 +1257,40 @@ function Settings({
   const [date, setDate] = useState(birth),
     [saved, setSaved] = useState(false),
     [error, setError] = useState("");
+  const [backupError, setBackupError] = useState("");
+  const [backupStatus, setBackupStatus] = useState("");
+  const [pendingBackup, setPendingBackup] = useState<DiaryData | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  function downloadBackup() {
+    setBackupError("");
+    setBackupStatus("");
+    try {
+      const url = URL.createObjectURL(new Blob([exportDiary()], { type: "application/json" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `tihiy-chas-${dateKey()}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      setBackupStatus("Файл подготовлен. Проверьте загрузки на устройстве.");
+    } catch (err) {
+      setBackupError(err instanceof Error ? err.message : "Не удалось создать файл.");
+    }
+  }
+  async function chooseBackup(file?: File) {
+    setBackupError("");
+    setBackupStatus("");
+    if (!file) return;
+    try {
+      if (file.size > 10 * 1024 * 1024) throw new Error("Файл слишком большой. Выберите файл экспорта дневника.");
+      setPendingBackup(parseDiaryBackup(await file.text()));
+    } catch (err) {
+      setBackupError(err instanceof Error ? err.message : "Не удалось прочитать файл.");
+    } finally {
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
   return (
     <>
       <PageTitle
@@ -1350,6 +1385,35 @@ function Settings({
           </div>
         </section>
       </div>
+      <section className={`${s.card} ${s.backupCard}`}>
+        <h2>Копия дневника</h2>
+        <p>Сохраните всю историю, комментарии и настройки в файл, чтобы перенести их в другой браузер или восстановить позже.</p>
+        <div className={s.backupActions}>
+          <button className={s.primary} type="button" onClick={downloadBackup}><Icon name="download" size={18} /> Экспортировать</button>
+          <button className={s.outlineButton} type="button" onClick={() => fileRef.current?.click()}>Импортировать</button>
+          <input ref={fileRef} type="file" accept=".json,application/json" hidden onChange={(e) => void chooseBackup(e.target.files?.[0])} />
+        </div>
+        <ErrorText message={backupError} />
+        {backupStatus && <p role="status">{backupStatus}</p>}
+      </section>
+      {pendingBackup && <Modal title="Импортировать дневник?" description="Проверьте файл перед импортом." onClose={() => setPendingBackup(null)}>
+        <div className={s.backupConfirm}>
+          <p>В файле дней: <strong>{Object.keys(pendingBackup.days).length}</strong>.</p>
+          <p>Импорт заменит все записи и настройки в этом браузере данными из файла. Если здесь есть нужные записи, сначала экспортируйте их.</p>
+          <button className={s.primary} type="button" onClick={() => {
+            const err = importDiary(pendingBackup);
+            if (err) setBackupError(err);
+            else {
+              setDate(pendingBackup.birthDate);
+              setSaved(false);
+              setError("");
+              setBackupStatus("Дневник импортирован. Проверьте историю и настройки.");
+            }
+            setPendingBackup(null);
+          }}>Заменить и импортировать</button>
+          <button className={s.textButton} type="button" onClick={() => setPendingBackup(null)}>Отмена</button>
+        </div>
+      </Modal>}
       <div className={s.storageInfo}>
         <Icon name="leaf" size={22} />
         <div>
