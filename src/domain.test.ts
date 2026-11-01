@@ -10,6 +10,7 @@ import {
   napNumber,
   nightError,
   nightStats,
+  sumDurations,
   timestamp,
   validateEvents,
 } from "./domain";
@@ -53,6 +54,12 @@ const day: DayRecord = {
   night: { rows, complete: true },
 };
 describe("время и фактические итоги", () => {
+  it("складывает промежутки с переносом минут и проверяет ввод", () => {
+    expect(sumDurations([{ hours: "2", minutes: "45" }, { hours: "1", minutes: "00" }, { hours: "3", minutes: "54" }])).toBe(459);
+    expect(sumDurations([{ hours: "", minutes: "59" }, { hours: "", minutes: "1" }])).toBe(60);
+    expect(sumDurations([{ hours: "", minutes: "60" }])).toBeNull();
+    expect(sumDurations([{ hours: "-1", minutes: "00" }])).toBeNull();
+  });
   it("объединяет продления, сохраняя перерывы в суммарном бодрствовании", () => {
     const d: DayRecord = { ...day, events: [
       { id: "1", kind: "wake", at: at(day.date, "14:00"), comment: "" },

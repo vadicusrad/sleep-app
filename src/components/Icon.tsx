@@ -10,6 +10,7 @@ export type IconName =
   | "plus"
   | "check"
   | "clock"
+  | "calculator"
   | "message"
   | "copy"
   | "close"
@@ -51,6 +52,12 @@ const paths: Record<IconName, React.ReactNode> = {
     <>
       <circle cx="12" cy="12" r="9" />
       <path d="M12 7v5l3 2" />
+    </>
+  ),
+  calculator: (
+    <>
+      <rect x="5" y="2" width="14" height="20" rx="2" />
+      <path d="M8 6h8M8 10h2m4 0h2m-8 4h2m4 0h2m-8 4h2m4 0h2" />
     </>
   ),
   message: (

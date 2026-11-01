@@ -19,6 +19,7 @@ import {
   napSummary,
   nightStats,
   shiftDate,
+  sumDurations,
   timeInput,
   timestamp,
   uid,
@@ -30,7 +31,8 @@ import s from "./App.module.css";
 const nav = [
   { to: "/", label: "Сегодня", icon: "sun" },
   { to: "/history", label: "История", icon: "history" },
-  { to: "/norms", label: "Нормы сна", icon: "book" },
+  { to: "/norms", label: "Нормы сна", mobileLabel: "Нормы", icon: "book" },
+  { to: "/calculator", label: "Калькулятор", mobileLabel: "Расчёт", icon: "calculator" },
   { to: "/settings", label: "Настройки", icon: "settings" },
 ] as const;
 function useNow() {
@@ -1243,6 +1245,43 @@ function Norms() {
     </>
   );
 }
+type CalculatorRow = { id: string; hours: string; minutes: string };
+const newCalculatorRow = (): CalculatorRow => ({ id: uid(), hours: "", minutes: "" });
+function Calculator({ rows, setRows }: { rows: CalculatorRow[]; setRows: React.Dispatch<React.SetStateAction<CalculatorRow[]>> }) {
+  const total = sumDurations(rows);
+  const hasValues = rows.some((row) => row.hours !== "" || row.minutes !== "");
+  function update(id: string, field: "hours" | "minutes", value: string) {
+    setRows((current) => current.map((row) => row.id === id ? { ...row, [field]: value } : row));
+  }
+  return (
+    <>
+      <PageTitle kicker="ПРОСТЫЕ ПОДСЧЁТЫ" title="Калькулятор часов" subtitle="Сложите любое количество промежутков времени." />
+      <section className={`${s.card} ${s.calculator}`}>
+        <h2>Сложить время</h2>
+        <p>Введите часы и минуты для каждого промежутка.</p>
+        <div className={s.calculatorRows}>
+          {rows.map((row, i) => (
+            <div className={s.calculatorRow} key={row.id}>
+              <span className={s.calculatorIndex}>{i + 1}</span>
+              <label>Часы<input type="text" inputMode="numeric" pattern="[0-9]*" maxLength={6} placeholder="0" value={row.hours} aria-label={`Часы, промежуток ${i + 1}`} onChange={(e) => update(row.id, "hours", e.target.value)} /></label>
+              <span className={s.calculatorColon}>:</span>
+              <label>Минуты<input type="text" inputMode="numeric" pattern="[0-9]*" maxLength={2} placeholder="00" value={row.minutes} aria-label={`Минуты, промежуток ${i + 1}`} aria-invalid={row.minutes !== "" && (!/^\d{1,2}$/.test(row.minutes) || Number(row.minutes) > 59)} onChange={(e) => update(row.id, "minutes", e.target.value)} /></label>
+              <button type="button" className={s.calculatorRemove} aria-label={`Удалить промежуток ${i + 1}`} onClick={() => setRows((current) => current.length === 1 ? [newCalculatorRow()] : current.filter((x) => x.id !== row.id))}><Icon name="trash" size={18} /></button>
+            </div>
+          ))}
+        </div>
+        <button type="button" className={s.calculatorAdd} onClick={() => setRows((current) => [...current, newCalculatorRow()])}><Icon name="plus" size={18} /> Добавить время</button>
+        {total === null && <ErrorText message="Введите целые часы и минуты от 0 до 59." />}
+        <div className={s.calculatorResult} role="status" aria-live="polite">
+          <span>Итого</span>
+          <strong>{total !== null && hasValues ? `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}` : "—"}</strong>
+          {total !== null && hasValues && <small>{duration(total)}</small>}
+        </div>
+        <button type="button" className={s.calculatorClear} onClick={() => setRows([newCalculatorRow(), newCalculatorRow()])}>Очистить</button>
+      </section>
+    </>
+  );
+}
 function Settings({
   install,
   onInstall,
@@ -1440,6 +1479,7 @@ interface InstallEvent extends Event {
   prompt: () => Promise<void>;
 }
 export default function App() {
+  const [calculatorRows, setCalculatorRows] = useState<CalculatorRow[]>(() => [newCalculatorRow(), newCalculatorRow()]);
   const birth = useDiary((x) => x.birthDate);
   const [today, setToday] = useState(dateKey);
   useEffect(() => {
@@ -1555,6 +1595,7 @@ export default function App() {
             <Route path="/" element={<DayPage />} />
             <Route path="/history" element={<History />} />
             <Route path="/norms" element={<Norms />} />
+            <Route path="/calculator" element={<Calculator rows={calculatorRows} setRows={setCalculatorRows} />} />
             <Route
               path="/settings"
               element={
@@ -1591,7 +1632,7 @@ export default function App() {
             className={({ isActive }) => (isActive ? s.mobileActive : "")}
           >
             <Icon name={n.icon} size={21} />
-            <span>{n.label}</span>
+            <span>{"mobileLabel" in n ? n.mobileLabel : n.label}</span>
           </NavLink>
         ))}
       </nav>

@@ -44,6 +44,16 @@ export function duration(value: number) {
     ? `${Math.floor(m / 60)} ч${m % 60 ? ` ${m % 60} мин` : ""}`
     : `${m} мин`;
 }
+export function sumDurations(rows: { hours: string; minutes: string }[]): number | null {
+  let total = 0;
+  for (const row of rows) {
+    if (!/^\d{0,6}$/.test(row.hours) || !/^\d{0,2}$/.test(row.minutes)) return null;
+    const hours = Number(row.hours), mins = Number(row.minutes);
+    if (mins > 59) return null;
+    total += hours * 60 + mins;
+  }
+  return Number.isSafeInteger(total) ? total : null;
+}
 export function dateLabel(
   date: string,
   options: Intl.DateTimeFormatOptions = { day: "numeric", month: "long" },
