@@ -906,6 +906,36 @@ h1 {
   font-size: 10px;
   font-weight: 400;
 }
+.contextField {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+.contextField legend {
+  padding: 0;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+.contextChoices { display: flex; flex-wrap: wrap; gap: 8px; }
+.contextChoice {
+  color: inherit;
+  background: transparent;
+  border: 1px solid #9ca88f;
+  border-radius: 8px;
+  padding: 7px 10px;
+}
+.contextChoice[aria-pressed="true"] { background: #e3ebd9; color: #384a30; }
+:global([data-theme="dark"]) .contextChoice[aria-pressed="true"] { background: #435840; color: #eef6e9; }
+.form label.observationCheck, .contextField label.observationCheck {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+.observationCheck input[type="checkbox"] { margin: 0; width: 18px; min-height: 18px; height: 18px; }
 .error {
   font-size: 12px;
   line-height: 1.6;

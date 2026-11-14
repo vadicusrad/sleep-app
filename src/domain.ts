@@ -1,3 +1,6 @@
+import { dayContexts, formatNightHelp, resettleMethods, sleepPlaces, wakeMoods } from "./observations";
+import type { DayContext, NightHelp, ResettleMethod, SleepPlace, WakeMood } from "./observations";
+
 export type EventKind = "wake" | "sleep" | "night";
 export interface SleepEvent {
   id: string;
@@ -6,6 +9,10 @@ export interface SleepEvent {
   comment: string;
   plannedMinutes?: number;
   continuation?: boolean;
+  sleepPlace?: SleepPlace;
+  wakeMood?: WakeMood;
+  resettleMethod?: ResettleMethod;
+  resettleFailed?: true;
 }
 export interface NightRow {
   id: string;
@@ -17,7 +24,8 @@ export interface DayRecord {
   date: string;
   events: SleepEvent[];
   note: string;
-  night: { rows: NightRow[]; complete: boolean };
+  contexts?: DayContext[];
+  night: { rows: NightRow[]; complete: boolean; help?: NightHelp };
 }
 export const uid = () => crypto.randomUUID();
 export const dateKey = (date = new Date()) =>
@@ -216,8 +224,19 @@ export function napSummary(events: SleepEvent[], wakeIndex: number) {
   }
   return { sleep, awake };
 }
+
+export function eventObservations(event: SleepEvent, followedByContinuation = false) {
+  return [
+    event.sleepPlace && sleepPlaces[event.sleepPlace],
+    event.wakeMood && `Проснулся: ${wakeMoods[event.wakeMood].toLowerCase()}`,
+    event.resettleMethod && resettleMethods[event.resettleMethod],
+    event.resettleFailed && !followedByContinuation && "Пробовали продлить, не получилось",
+  ].filter(Boolean).join(" · ");
+}
+
 export function diaryText(day: DayRecord, next?: DayRecord) {
-  const stats = dayStats(day),
+  const end = day.events.at(-1)?.at;
+  const stats = dayStats(day, end),
     lines = [
       `Дата: ${dateLabel(day.date, { day: "2-digit", month: "2-digit", year: "numeric" })}`,
       "",
@@ -234,12 +253,14 @@ export function diaryText(day: DayRecord, next?: DayRecord) {
     lines.push(
       `${e.kind === "night" ? "НС" : e.kind === "sleep" ? e.continuation ? `Продолжение ${nap} ДС` : `${nap} ДС — уснул` : i === 0 ? "Подъем" : "Проснулся"} ${timeInput(e.at)}${e.kind === "wake" && prev?.kind === "sleep" ? ` (сон ${duration(minutes(prev.at, e.at))})` : ""}${e.comment ? ` — ${e.comment}` : ""}`,
     );
+    const observations = eventObservations(e, day.events[i + 1]?.continuation);
+    if (observations) lines.push(observations);
     const summary = napSummary(day.events, i);
     if (summary && !day.events[i + 1]?.continuation) lines.push(`Итого сон ${duration(summary.sleep)}, перерыв ${duration(summary.awake)}`);
   });
   lines.push(
-    `СДС ${duration(stats.sleep)}`,
-    `Суммарное дневное ВБ ${duration(stats.awake)}`,
+    `СДС ${duration(stats.sleep)}${day.events.at(-1)?.kind === "night" ? "" : " (по завершённым отрезкам)"}`,
+    `Суммарное дневное ВБ ${duration(stats.awake)}${day.events.at(-1)?.kind === "night" ? "" : " (до последней отметки)"}`,
     "",
     "Ночью:",
   );
@@ -255,13 +276,35 @@ export function diaryText(day: DayRecord, next?: DayRecord) {
     ),
   );
   if (day.night.complete) lines.push(`Фактический НС ${duration(stats.night)}`);
-  if (next?.events[0])
-    lines.push(`Следующий подъем ${timeInput(next.events[0].at)}`);
+  if (day.night.help) lines.push(`Пробуждения с помощью: ${formatNightHelp(day.night.help)}`);
+  const nightEnd = day.night.complete ? day.night.rows.at(-1)?.end : undefined;
+  const nextWake = nightEnd ? new Date(nightEnd).getTime() : next?.events[0]?.at;
+  if (nextWake !== undefined)
+    lines.push(`Следующий подъем ${timeInput(nextWake)}`);
   lines.push(
-    day.night.complete && next
+    nightEnd
       ? `Сон за сутки ${duration(stats.sleep + stats.night)}`
       : "Суточный итог пока неполный",
   );
   if (day.note) lines.push("", `Заметка дня: ${day.note}`);
+  if (day.contexts?.length) lines.push(`Обстоятельства: ${day.contexts.map((context) => dayContexts[context]).join(", ")}`);
   return lines.join("\n");
+}
+
+export function fullDiaryText(days: Record<string, DayRecord>) {
+  const records = Object.values(days)
+    .filter((day) => day.events.length || day.note.trim() || day.contexts?.length)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  let next: DayRecord | undefined;
+  return records.slice().reverse().map((day) => {
+    const result = day.events.length
+      ? diaryText(day, next)
+      : [
+        `Дата: ${dateLabel(day.date, { day: "2-digit", month: "2-digit", year: "numeric" })}`,
+        day.note && `Заметка дня: ${day.note}`,
+        day.contexts?.length && `Обстоятельства: ${day.contexts.map((context) => dayContexts[context]).join(", ")}`,
+      ].filter(Boolean).join("\n");
+    if (day.events.length) next = day;
+    return result;
+  }).reverse().join("\n\n────────────────────\n\n");
 }

@@ -19,7 +19,7 @@ vi.stubGlobal("localStorage", {
   setItem: (k: string, v: string) => memory.set(k, v),
   removeItem: (k: string) => memory.delete(k),
 });
-const { useDiary, STORAGE_KEY, exportDiary, parseDiaryBackup, importDiary } = await import("./store");
+const { useDiary, STORAGE_KEY, exportDiary, exportDiaryText, parseDiaryBackup, importDiary } = await import("./store");
 const add = (d: string, k: "wake" | "sleep" | "night", t: string) =>
   useDiary
     .getState()
@@ -29,6 +29,35 @@ beforeEach(() => {
   useDiary.setState({ birthDate: "", days: {}, lastWake: null, theme: "light" });
 });
 describe("журнал и сохранение", () => {
+  it("переносит новые отметки в JSON и текст, включая явно указанный ноль", () => {
+    const date = "2026-10-23";
+    add(date, "wake", "07:00");
+    const store = useDiary.getState();
+    expect(store.addEvent(date, { kind: "sleep", at: timestamp(date, "10:00"), sleepPlace: "crib", comment: "Легко уснул" })).toBeNull();
+    expect(store.addEvent(date, { kind: "wake", at: timestamp(date, "10:42"), wakeMood: "calm", comment: "" })).toBeNull();
+    expect(store.addEvent(date, { kind: "sleep", at: timestamp(date, "10:46"), resettleMethod: "self", continuation: true, comment: "" })).toBeNull();
+    add(date, "wake", "11:25");
+    add(date, "night", "20:00");
+    store.setContexts(date, ["massage"]);
+    store.setNightHelp(date, { count: 0, approximate: false });
+    store.draftNight(date, [{ id: "night", start: `${date}T20:00`, end: "2026-10-24T06:00", comment: "Спокойная ночь" }]);
+    expect(store.completeNight(date)).toBeNull();
+    store.setNote("2026-10-24", "Следующий день");
+    const restored = parseDiaryBackup(exportDiary());
+    expect(restored.days[date].night.help).toEqual({ count: 0, approximate: false });
+    expect(restored.days[date].events[3].resettleMethod).toBe("self");
+    expect(restored.days["2026-10-24"].night.help).toBeUndefined();
+    expect(store.editEvent(date, restored.days[date].events[1].id, { at: timestamp(date, "10:02") })).toBeNull();
+    expect(useDiary.getState().days[date].night.complete).toBe(true);
+    const report = exportDiaryText();
+    expect(report).toContain("Итого сон 1 ч 19 мин, перерыв 4 мин");
+    expect(report).toContain("Следующий подъем 06:00");
+    expect(report).toContain("Пробуждения с помощью: 0");
+    expect(report).toContain("Сам уснул снова");
+    expect(report).toContain("Обстоятельства: Массаж");
+    expect(report).toContain("В кроватке");
+    expect(report.indexOf("23.10.2026")).toBeLessThan(report.indexOf("24.10.2026"));
+  });
   it("сохраняет тему и переносит её вместе с дневником, поддерживая старые копии", () => {
     useDiary.getState().setTheme("dark");
     const backup = parseDiaryBackup(exportDiary());

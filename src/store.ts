@@ -1,7 +1,9 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { DayRecord, SleepEvent, NightRow } from "./domain";
-import { uid, validateEvents, dateKey, nightError } from "./domain";
+import { uid, validateEvents, dateKey, nightError, fullDiaryText } from "./domain";
+import { dayContexts, isChoice, resettleMethods, sleepPlaces, wakeMoods } from "./observations";
+import type { DayContext, NightHelp } from "./observations";
 
 export const STORAGE_KEY = "quiet-hour-v1";
 let initialIssue = "";
@@ -19,6 +21,9 @@ export interface DiaryData {
 }
 const object = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === "object";
+const validNightHelp = (help: unknown): help is NightHelp =>
+  object(help) && typeof help.count === "number" && Number.isSafeInteger(help.count) &&
+  help.count >= 0 && typeof help.approximate === "boolean";
 function validState(v: unknown): boolean {
   if (
     !object(v) ||
@@ -35,6 +40,7 @@ function validState(v: unknown): boolean {
       d.date === key &&
       /^\d{4}-\d{2}-\d{2}$/.test(key) &&
       typeof d.note === "string" &&
+      (d.contexts === undefined || (Array.isArray(d.contexts) && d.contexts.every((v) => isChoice(dayContexts, v)))) &&
       Array.isArray(d.events) &&
       d.events.every(
         (e) =>
@@ -45,11 +51,16 @@ function validState(v: unknown): boolean {
           Number.isFinite(e.at) &&
           typeof e.comment === "string" &&
           (e.continuation === undefined || typeof e.continuation === "boolean") &&
+          (e.sleepPlace === undefined || (e.kind !== "wake" && isChoice(sleepPlaces, e.sleepPlace))) &&
+          (e.wakeMood === undefined || (e.kind === "wake" && isChoice(wakeMoods, e.wakeMood))) &&
+          (e.resettleMethod === undefined || (e.kind === "sleep" && e.continuation === true && isChoice(resettleMethods, e.resettleMethod))) &&
+          (e.resettleFailed === undefined || (e.kind === "wake" && e.resettleFailed === true)) &&
           (e.plannedMinutes === undefined ||
             typeof e.plannedMinutes === "number"),
       ) &&
       object(d.night) &&
       typeof d.night.complete === "boolean" &&
+      (d.night.help === undefined || validNightHelp(d.night.help)) &&
       Array.isArray(d.night.rows) &&
       d.night.rows.every(
         (r) =>
@@ -65,6 +76,13 @@ export function exportDiary(): string {
   if (blocked) throw new Error("Не удалось прочитать исходный дневник. Экспорт недоступен, чтобы не сохранить пустую копию.");
   const { birthDate, lastWake, days, theme } = useDiary.getState();
   return JSON.stringify({ format: "quiet-hour-backup", version: 1, data: { birthDate, lastWake, days, theme } }, null, 2);
+}
+
+export function exportDiaryText(): string {
+  if (blocked) throw new Error("Не удалось прочитать исходный дневник.");
+  const result = fullDiaryText(useDiary.getState().days);
+  if (!result) throw new Error("Дневник пока пуст.");
+  return result;
 }
 
 export function parseDiaryBackup(raw: string): DiaryData {
@@ -146,6 +164,8 @@ interface AppState {
   undoEvent: (date: string) => string | null;
   setPlan: (date: string, id: string, value: number) => void;
   setNote: (date: string, note: string) => void;
+  setContexts: (date: string, contexts: DayContext[]) => void;
+  setNightHelp: (date: string, help?: NightHelp) => void;
   draftNight: (date: string, rows: NightRow[]) => void;
   completeNight: (date: string) => string | null;
 }
@@ -215,9 +235,8 @@ export const useDiary = create<AppState>()(
           return "Подъем должен быть позже предыдущего дня.";
         if (next && events.at(-1)!.at >= next.events[0].at)
           return "Событие должно быть раньше следующего дня.";
-        const changedTime =
-          patch.at !== undefined &&
-          patch.at !== day.events.find((e) => e.id === id)?.at;
+        const bedtimeChanged = day.events.at(-1)?.kind === "night" &&
+          day.events.at(-1)?.at !== events.at(-1)?.at;
         const days = {
           ...get().days,
           [date]: {
@@ -225,7 +244,7 @@ export const useDiary = create<AppState>()(
             events,
             night: {
               ...day.night,
-              complete: changedTime ? false : day.night.complete,
+              complete: !bedtimeChanged && day.night.complete,
             },
           },
         };
@@ -290,6 +309,17 @@ export const useDiary = create<AppState>()(
             [date]: { ...(get().days[date] ?? blank(date)), note },
           },
         }),
+      setContexts: (date, contexts) => set((state) => ({
+        days: {
+          ...state.days,
+          [date]: { ...(state.days[date] ?? blank(date)), contexts: [...new Set(contexts)] },
+        },
+      })),
+      setNightHelp: (date, help) => {
+        const day = get().days[date];
+        if (!day || (help !== undefined && !validNightHelp(help))) return;
+        set({ days: { ...get().days, [date]: { ...day, night: { ...day.night, help } } } });
+      },
       draftNight: (date, rows) => {
         const day = get().days[date];
         if (day) {
@@ -306,7 +336,7 @@ export const useDiary = create<AppState>()(
               ...get().days,
               [date]: {
                 ...day,
-                night: { rows, complete: sameTimes && day.night.complete },
+                night: { ...day.night, rows, complete: sameTimes && day.night.complete },
               },
             },
           });

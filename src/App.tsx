@@ -1,9 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
-import { NavLink, Link, Route, Routes, useLocation } from "react-router";
+import { NavLink, Link, Route, Routes, useLocation, useSearchParams } from "react-router";
 import { registerSW } from "virtual:pwa-register";
 import { Icon } from "./components/Icon";
-import { useDiary, storageIssue, exportDiary, parseDiaryBackup, importDiary } from "./store";
+import { useDiary, storageIssue, exportDiary, exportDiaryText, parseDiaryBackup, importDiary } from "./store";
 import type { DiaryData } from "./store";
 import {
   ageLabel,
@@ -15,6 +15,7 @@ import {
   dayPeriodNotice,
   diaryText,
   duration,
+  eventObservations,
   localDateTime,
   minutes,
   napNumber,
@@ -27,12 +28,16 @@ import {
   uid,
 } from "./domain";
 import type { DayRecord, EventKind, NightRow, SleepEvent } from "./domain";
+import { dayContexts, formatNightHelp, resettleMethods, sleepPlaces, isChoice, wakeMoods } from "./observations";
+import type { DayContext } from "./observations";
+import { Analytics } from "./Analytics";
 import { norms, normsForAge, compareRange, rangeDifference, nightRangeForAge, totalSleepRangeForAge } from "./norms";
 import s from "./App.module.css";
 
 const nav = [
   { to: "/", label: "Сегодня", icon: "sun" },
   { to: "/history", label: "История", icon: "history" },
+  { to: "/analytics", label: "Аналитика", mobileLabel: "Анализ", icon: "chart" },
   { to: "/norms", label: "Нормы сна", mobileLabel: "Нормы", icon: "book" },
   { to: "/calculator", label: "Калькулятор", mobileLabel: "Расчёт", icon: "calculator" },
   { to: "/settings", label: "Настройки", icon: "settings" },
@@ -156,9 +161,16 @@ function EventForm({
   );
   const [comment, setComment] = useState(event?.comment ?? "");
   const [isContinuation, setIsContinuation] = useState(event?.continuation ?? continuation);
+  const [sleepPlace, setSleepPlace] = useState(event?.sleepPlace);
+  const [wakeMood, setWakeMood] = useState(event?.wakeMood);
+  const [resettleMethod, setResettleMethod] = useState(event?.resettleMethod);
+  const [resettleFailed, setResettleFailed] = useState(!!event?.resettleFailed);
   const events = useDiary((x) => x.days[date]?.events);
   const eventIndex = event ? events?.findIndex((e) => e.id === event.id) ?? -1 : events?.length ?? 0;
   const canContinue = kind === "sleep" && events?.[eventIndex - 1]?.kind === "wake" && events?.[eventIndex - 2]?.kind === "sleep";
+  const afterNap = kind === "wake" && events?.[eventIndex - 1]?.kind === "sleep";
+  const didContinue = canContinue && isContinuation;
+  const followedByContinuation = !!events?.[eventIndex + 1]?.continuation;
   const [error, setError] = useState("");
   const add = useDiary((x) => x.addEvent),
     edit = useDiary((x) => x.editEvent);
@@ -171,9 +183,16 @@ function EventForm({
   function submit(e: FormEvent) {
     e.preventDefault();
     const at = timestamp(eventDate, time);
+    const details = {
+      at: event && at === timestamp(dateKey(new Date(event.at)), timeInput(event.at)) ? event.at : at,
+      comment, sleepPlace: didContinue ? undefined : sleepPlace, wakeMood,
+      resettleMethod: didContinue ? resettleMethod : undefined,
+      resettleFailed: afterNap && resettleFailed ? true as const : undefined,
+      continuation: didContinue || undefined,
+    };
     const err = event
-      ? edit(date, event.id, { at, comment, ...(canContinue ? { continuation: isContinuation } : {}) })
-      : add(date, { kind, at, comment, ...(isContinuation ? { continuation: true } : {}) });
+      ? edit(date, event.id, details)
+      : add(date, { kind, ...details });
     if (err) setError(err);
     else {
       onSaved();
@@ -219,6 +238,21 @@ function EventForm({
             </select>
           </label>
         )}
+        {kind !== "wake" && !didContinue && (
+          <ObservationSelect label="Где уснул" options={sleepPlaces} value={sleepPlace} onChange={setSleepPlace} />
+        )}
+        {didContinue && (
+          <ObservationSelect label="Как продлился сон" options={resettleMethods} value={resettleMethod} onChange={setResettleMethod} />
+        )}
+        {kind === "wake" && (
+          <ObservationSelect label="Как проснулся" options={wakeMoods} value={wakeMood} onChange={setWakeMood} />
+        )}
+        {afterNap && !followedByContinuation && (
+          <label className={s.observationCheck}>
+            <input type="checkbox" checked={resettleFailed} onChange={(e) => setResettleFailed(e.target.checked)} />
+            Пробовали продлить, не получилось
+          </label>
+        )}
         <label>
           Комментарий <span className={s.optional}>необязательно</span>
           <textarea
@@ -238,12 +272,46 @@ function EventForm({
     </Modal>
   );
 }
+function ObservationSelect<T extends string>({ label, options, value, onChange }: {
+  label: string;
+  options: Record<T, string>;
+  value?: T;
+  onChange: (value: T | undefined) => void;
+}) {
+  return (
+    <label>
+      {label} <span className={s.optional}>необязательно</span>
+      <select value={value ?? ""} onChange={(e) => onChange(isChoice(options, e.target.value) ? e.target.value : undefined)}>
+        <option value="">Не отмечено</option>
+        {(Object.keys(options) as T[]).map((key) => <option key={key} value={key}>{options[key]}</option>)}
+      </select>
+    </label>
+  );
+}
 function NoteModal({ date, onClose }: { date: string; onClose: () => void }) {
   const note = useDiary((x) => x.days[date]?.note ?? "");
+  const contexts = useDiary((x) => x.days[date]?.contexts) ?? [];
+  const setContexts = useDiary((x) => x.setContexts);
   const set = useDiary((x) => x.setNote);
   return (
     <Modal title="Заметка дня" description={dateLabel(date)} onClose={onClose}>
       <div className={s.form}>
+        <fieldset className={s.contextField}>
+          <legend>Обстоятельства дня</legend>
+          <div className={s.contextChoices}>
+            {(Object.keys(dayContexts) as DayContext[]).map((key) => (
+              <button
+                className={s.contextChoice}
+                key={key}
+                type="button"
+                aria-pressed={contexts.includes(key)}
+                onClick={() => setContexts(date, contexts.includes(key) ? contexts.filter((value) => value !== key) : [...contexts, key])}
+              >
+                {dayContexts[key]}
+              </button>
+            ))}
+          </div>
+        </fieldset>
         <textarea
           autoFocus
           rows={5}
@@ -380,6 +448,7 @@ function NightEditor({
 }) {
   const draft = useDiary((x) => x.draftNight),
     complete = useDiary((x) => x.completeNight);
+  const setNightHelp = useDiary((x) => x.setNightHelp);
   const live = useDiary((x) => x.days[day.date]);
   const rows = live.night.rows;
   const [error, setError] = useState("");
@@ -436,10 +505,37 @@ function NightEditor({
   return (
     <Modal
       title="Как прошла ночь?"
-      description={`Ночь ${dateLabel(day.date)} → ${dateLabel(shiftDate(day.date, 1))}. Запишите только время сна.`}
+      description={`Ночь ${dateLabel(day.date)} → ${dateLabel(shiftDate(day.date, 1))}`}
       onClose={onClose}
     >
       <div className={s.nightBody}>
+        <fieldset className={s.contextField}>
+          <legend>Пробуждения с помощью</legend>
+          <label>
+            Сколько раз понадобилась помощь <span className={s.optional}>необязательно</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              placeholder="Не отмечено"
+              value={live.night.help?.count ?? ""}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value === "") setNightHelp(day.date, undefined);
+                else if (/^\d+$/.test(value) && Number.isSafeInteger(Number(value)))
+                  setNightHelp(day.date, { count: Number(value), approximate: live.night.help?.approximate ?? false });
+              }}
+            />
+          </label>
+          <label className={s.observationCheck}>
+            <input type="checkbox" disabled={!live.night.help} checked={live.night.help?.approximate ?? false}
+              onChange={(e) => {
+                if (live.night.help) setNightHelp(day.date, { ...live.night.help, approximate: e.target.checked });
+              }}
+            />
+            Примерное число
+          </label>
+          <p className={s.small}>Сохраняется отдельно от интервалов. Если помощь не понадобилась, укажите 0.</p>
+        </fieldset>
         {rows.map((r, i) => (
           <div className={s.nightRow} key={r.id}>
             <div className={s.rowTitle}>
@@ -605,6 +701,7 @@ function Stats({
               ? "Есть черновик"
               : "Заполняем утром"}
         </p>
+        {day?.night.help && <p>Пробуждения с помощью: {formatNightHelp(day.night.help)}</p>}
       </StatItem>
       <StatItem label="Сон за сутки" value={complete ? duration(stats.sleep + stats.night) : "—"} comparison={totalRange ? { subject: "Сон за период", value: stats.sleep + stats.night, range: totalRange, periodNotice } : undefined}>
         <p>{complete ? "От подъема до подъема" : "Итог после заполнения ночи"}</p>
@@ -658,6 +755,10 @@ function Timeline({
             const isSleep = e.kind === "sleep" || e.kind === "night";
             const wake = e.kind === "sleep" && day.events[i + 1]?.kind === "wake" ? day.events[i + 1] : undefined;
             const summary = wake ? napSummary(day.events, i + 1) : null;
+            const observations = [
+              eventObservations(e),
+              wake && eventObservations(wake, day.events[i + 2]?.continuation),
+            ].filter(Boolean).join(" · ");
             return (
               <div key={e.id} className={s.timelineItem}>
                 {prev?.kind === "wake" && (
@@ -691,8 +792,9 @@ function Timeline({
                         </button> : <span className={s.timePending}>спит</span>}
                       </>}
                     </div>
-                    {wake && <p className={s.sleepCalculation}>Спал {e.continuation ? "ещё " : ""}{duration(minutes(e.at, wake.at))}</p>}
+                    {wake && <p className={s.sleepCalculation}>{e.continuation ? "Доспал" : "До первого пробуждения"} · {duration(minutes(e.at, wake.at))}</p>}
                     {summary && !day.events[i + 2]?.continuation && <p className={s.sleepCalculation}>Итого: сон {duration(summary.sleep)}, перерыв {duration(summary.awake)}</p>}
+                    {observations && <p className={s.sleepCalculation}>{observations}</p>}
                     {e.comment && <button type="button" className={s.eventComment} onClick={() => onEdit(e)} aria-label={`Изменить комментарий к событию ${timeInput(e.at)}`}><span className={s.commentHeading}>{wake ? "При засыпании" : "Комментарий"}<Icon name="edit" size={14} /></span><span className={s.commentContent}>{e.comment}</span></button>}
                     {wake?.comment && <button type="button" className={s.eventComment} onClick={() => onEdit(wake)} aria-label={`Изменить комментарий к пробуждению ${timeInput(wake.at)}`}><span className={s.commentHeading}>При пробуждении<Icon name="edit" size={14} /></span><span className={s.commentContent}>{wake.comment}</span></button>}
                   </div>
@@ -812,7 +914,7 @@ function DayPage({ initialDate }: { initialDate?: string }) {
         <div className={s.mainColumn}>
           <button className={`${s.noteButton} ${s.dayNote}`} onClick={() => setNote(true)}>
             <Icon name="message" size={20} />
-            <span><strong>Заметка дня</strong><span>{day?.note || "Добавить заметку о дне"}</span></span>
+            <span><strong>Заметка дня</strong><span>{[day?.contexts?.map((key) => dayContexts[key]).join(" · "), day?.note].filter(Boolean).join("\n") || "Добавить заметку о дне"}</span></span>
             <Icon name={day?.note ? "edit" : "plus"} size={18} />
           </button>
           <section
@@ -1008,14 +1110,15 @@ function DayPage({ initialDate }: { initialDate?: string }) {
 }
 function History() {
   const days = useDiary((x) => x.days);
-  const [selected, setSelected] = useState<string | null>(null);
+  const [params, setParams] = useSearchParams();
+  const selected = params.get("date");
   const records = Object.values(days)
     .filter((d) => d.events.length)
     .sort((a, b) => b.date.localeCompare(a.date));
-  if (selected)
+  if (selected && days[selected]?.events.length)
     return (
       <>
-        <button className={s.backButton} onClick={() => setSelected(null)}>
+        <button className={s.backButton} onClick={() => setParams({})}>
           <Icon name="arrow" style={{ transform: "rotate(180deg)" }} />К истории
         </button>
         <DayPage key={selected} initialDate={selected} />
@@ -1036,7 +1139,7 @@ function History() {
               <button
                 key={day.date}
                 className={s.historyDay}
-                onClick={() => setSelected(day.date)}
+                onClick={() => setParams({ date: day.date })}
               >
                 <span className={s.historyDate}>
                   <b>{dateLabel(day.date, { day: "numeric" })}</b>
@@ -1233,14 +1336,16 @@ function Settings({
   const [backupStatus, setBackupStatus] = useState("");
   const [pendingBackup, setPendingBackup] = useState<DiaryData | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  function downloadBackup() {
+  function downloadDiary(format: "json" | "txt") {
     setBackupError("");
     setBackupStatus("");
     try {
-      const url = URL.createObjectURL(new Blob([exportDiary()], { type: "application/json" }));
+      const content = format === "json" ? exportDiary() : exportDiaryText();
+      const type = format === "json" ? "application/json" : "text/plain;charset=utf-8";
+      const url = URL.createObjectURL(new Blob([content], { type }));
       const link = document.createElement("a");
       link.href = url;
-      link.download = `sny-romy-${dateKey()}.json`;
+      link.download = `sny-romy-${dateKey()}.${format}`;
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -1367,10 +1472,11 @@ function Settings({
       </section>
       <section className={`${s.card} ${s.backupCard}`}>
         <h2>Копия дневника</h2>
-        <p>Сохраните всю историю, комментарии и настройки в файл, чтобы перенести их в другой браузер или восстановить позже.</p>
+        <p>Скачайте записи по дням для чтения или сохраните копию JSON для переноса и восстановления.</p>
         <div className={s.backupActions}>
-          <button className={s.primary} type="button" onClick={downloadBackup}><Icon name="download" size={18} /> Экспортировать</button>
-          <button className={s.outlineButton} type="button" onClick={() => fileRef.current?.click()}>Импортировать</button>
+          <button className={s.primary} type="button" onClick={() => downloadDiary("txt")}><Icon name="download" size={18} /> Скачать дневник (TXT)</button>
+          <button className={s.outlineButton} type="button" onClick={() => downloadDiary("json")}>Скачать копию (JSON)</button>
+          <button className={s.outlineButton} type="button" onClick={() => fileRef.current?.click()}>Импортировать JSON</button>
           <input ref={fileRef} type="file" accept=".json,application/json" hidden onChange={(e) => void chooseBackup(e.target.files?.[0])} />
         </div>
         <ErrorText message={backupError} />
@@ -1492,6 +1598,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<DayPage />} />
             <Route path="/history" element={<History />} />
+            <Route path="/analytics" element={<Analytics />} />
             <Route path="/norms" element={<Norms />} />
             <Route path="/calculator" element={<Calculator rows={calculatorRows} setRows={setCalculatorRows} />} />
             <Route

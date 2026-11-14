@@ -11,6 +11,7 @@ export type IconName =
   | "check"
   | "clock"
   | "calculator"
+  | "chart"
   | "message"
   | "copy"
   | "close"
@@ -63,6 +64,7 @@ const paths: Record<IconName, React.ReactNode> = {
   message: (
     <path d="M21 11a8 8 0 0 1-8 8H6l-4 3V9a7 7 0 0 1 7-7h4a8 8 0 0 1 8 9Z" />
   ),
+  chart: <path d="M4 4v16h16M8 15v-3m5 3V8m5 7V5" />,
   copy: (
     <>
       <rect x="8" y="8" width="12" height="13" rx="2" />
